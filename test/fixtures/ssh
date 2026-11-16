@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+"""Test-only SSH transport: execute the real helper with fake Apple processes."""
+import json
+import os
+from pathlib import Path
+import shlex
+import subprocess
+import sys
+
+with open(os.environ["FAKE_SSH_LOG"], "a") as log:
+    log.write(json.dumps(sys.argv[1:]) + "\n")
+command = shlex.split(sys.argv[-1])
+assert command[:2] == ["/usr/bin/python3", "-c"] and len(command) == 3
+if os.environ.get("FAKE_SSH_MODE") == "failure":
+    print("SECRET_SSH_DIAGNOSTIC", file=sys.stderr)
+    sys.exit(255)
+if os.environ.get("FAKE_SSH_MODE") == "overflow":
+    sys.stdout.write("SECRET" * 300000)
+    sys.exit(0)
+
+original = subprocess.Popen
+
+
+def fake_popen(argv, **kwargs):
+    allowed = {"/usr/bin/xcrun", "/usr/bin/xcodebuild", "/usr/bin/uname",
+               "/usr/bin/sw_vers", "/usr/bin/xcode-select"}
+    assert argv[0] in allowed
+    return original([sys.executable, str(Path(__file__).with_name("apple.py")), *argv], **kwargs)
+
+
+subprocess.Popen = fake_popen
+exec(compile(command[2], "<remote-helper>", "exec"), {"__name__": "__main__"})

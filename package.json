@@ -1,0 +1,29 @@
+{
+  "name": "factory-relay",
+  "version": "0.1.0",
+  "private": true,
+  "engines": { "node": ">=22" },
+  "description": "Shared Mac sample QA and replay evidence in Factory Droid.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "setup": "node scripts/setup.js",
+    "setup:mac": "node scripts/setup-mac.js",
+    "setup:test": "node --test test/setup.test.js test/setup-mac.test.js",
+    "check": "node --check scripts/setup.js && node --check scripts/setup-mac.js && node --check src/control.js && node --check scripts/build-control.js && node --check scripts/verify-control.js && node --check src/schema.js && node --check src/transport.js && node --check src/frames.js && node --check src/stream.js && node --check src/cli.js && node --check src/mcp.js && node --check scripts/build-host.js && node --check scripts/verify-host.js && node --check scripts/verify-stream.js && node --check scripts/stream-metrics.js && node --check scripts/verify-live.js && node --check scripts/verify-visual.js && node --check scripts/upload-fixture.js && node --check scripts/discover-xcode.js && node --check scripts/probe-live-bridge.js && python3 -c \"import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ['src/remote.py','src/bridge.py','src/visual.py','src/stream-supervisor.py','src/control-supervisor.py','test/control-supervisor.py','test/stream-supervisor.py','scripts/bridge-probe.py']]\"",
+    "cli": "node src/cli.js",
+    "mcp": "node src/mcp.js",
+    "qa": "node src/qa.js",
+    "qa:mcp": "node src/qa-mcp.js",
+    "qa:open": "node scripts/qa-open.js",
+    "qa:check": "node --check src/qa-store.js && node --check src/qa-broker.js && node --check src/qa-server.js && node --check src/qa.js && node --check src/qa-client.js && node --check src/qa-mcp.js && node --check src/qa-contract.js && node --check src/qa-tasks.js && node --check src/qa-export.js && node --check scripts/qa-open.js && node --check scripts/qa-acceptance.js && node --check scripts/qa-ui-fixture.js && node --check web/app.js && node --check web/qa-edit.js && node --check web/replay-entry.js",
+    "qa:test": "node --test test/qa.test.js test/qa-export.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  }
+}

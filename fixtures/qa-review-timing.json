@@ -1,0 +1,1460 @@
+{
+  "provenance": "Timing-only projection of saved acceptance run 8797e68a6d26b3ee679e28611c8454ee. No frames, credentials, or native input.",
+  "events": [
+    {
+      "kind": "run-start",
+      "status": "running",
+      "labels": {
+        "title": "Factory shared QA: live control and replay",
+        "context": "Real Mac acceptance. Includes an intentionally failing assertion to test failure review."
+      },
+      "elapsedMs": 0.3971260000107577
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 0,
+      "elapsedMs": 81.19906199999969
+    },
+    {
+      "kind": "step-start",
+      "stepId": "4933ebdbc557f9aeb3d71a8c63b18f7c",
+      "operation": "observe",
+      "elapsedMs": 104.33287199999904
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 291.3236590000015,
+      "elapsedMs": 338.3763840000029
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 558.3886449999991,
+      "elapsedMs": 564.4804790000053
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 789.6015679999982,
+      "elapsedMs": 834.1917870000034
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 1046.4359750000003,
+      "elapsedMs": 1095.7805450000014
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 1305.208101000011,
+      "elapsedMs": 1354.361883000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 1601.6897210000025,
+      "elapsedMs": 1651.1189100000047
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 1868.360406000007,
+      "elapsedMs": 1919.0428600000014
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 2124.969590000008,
+      "elapsedMs": 2134.7724860000017
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 2351.348973,
+      "elapsedMs": 2361.46826400001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 2632.7388710000087,
+      "elapsedMs": 2642.201217000009
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 2891.7919459999976,
+      "elapsedMs": 2902.4465920000075
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 3112.633486000006,
+      "elapsedMs": 3121.8374170000025
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 3407.7949760000047,
+      "elapsedMs": 3417.813467
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 3693.4479030000075,
+      "elapsedMs": 3705.273138000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 3932.862064000001,
+      "elapsedMs": 3947.0217249999987
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 4154.9486529999995,
+      "elapsedMs": 4161.248027000009
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 4437.008520000003,
+      "elapsedMs": 4449.581189000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 4727.226282000003,
+      "elapsedMs": 4740.298520000011
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 4976.401129999998,
+      "elapsedMs": 4986.927456000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 5198.667767999999,
+      "elapsedMs": 5210.728656000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 5385.312525000001,
+      "elapsedMs": 5489.702485000002
+    },
+    {
+      "kind": "observation",
+      "stepId": "4933ebdbc557f9aeb3d71a8c63b18f7c",
+      "actual": 2,
+      "elapsedMs": 5493.867710000006
+    },
+    {
+      "kind": "step-end",
+      "stepId": "4933ebdbc557f9aeb3d71a8c63b18f7c",
+      "status": "pass",
+      "elapsedMs": 5498.040288999997
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 5502.754626000009,
+      "elapsedMs": 5511.79673300001
+    },
+    {
+      "kind": "step-start",
+      "stepId": "5e4da1f6fb2410153cfd0429e14fe587",
+      "operation": "press",
+      "elapsedMs": 5515.83485900001
+    },
+    {
+      "kind": "action-attempt",
+      "stepId": "5e4da1f6fb2410153cfd0429e14fe587",
+      "status": "running",
+      "elapsedMs": 5519.855011000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 5778.188876,
+      "elapsedMs": 5789.486620000011
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 6018.261845000001,
+      "elapsedMs": 6029.56538
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 6232.4404080000095,
+      "elapsedMs": 6243.432799000002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 6453.420167999997,
+      "elapsedMs": 6462.295131000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 6683.388996000009,
+      "elapsedMs": 6689.475149000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 6972.142198000001,
+      "elapsedMs": 6984.057302000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 7200.495450000002,
+      "elapsedMs": 7210.273679999998
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 7496.888814999998,
+      "elapsedMs": 7512.488431000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 7726.35618100001,
+      "elapsedMs": 7736.7684020000015
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 8018.964554999999,
+      "elapsedMs": 8029.4320600000065
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 8239.622311,
+      "elapsedMs": 8251.585756
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 8530.240967999998,
+      "elapsedMs": 8540.734601999997
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 8752.848477000007,
+      "elapsedMs": 8762.694363000002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 9069.763514999999,
+      "elapsedMs": 9083.88962300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 9293.225919000004,
+      "elapsedMs": 9304.791828000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 9580.54539900001,
+      "elapsedMs": 9591.546816000002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 9804.821041000003,
+      "elapsedMs": 9819.060813000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 10110.202262000006,
+      "elapsedMs": 10127.938773000002
+    },
+    {
+      "kind": "action",
+      "stepId": "5e4da1f6fb2410153cfd0429e14fe587",
+      "status": "pass",
+      "reason": "input_acknowledged_requires_assertion",
+      "elapsedMs": 10348.603251000008
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 10366.422728000005,
+      "elapsedMs": 10371.177731000003
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 10641.820711000008,
+      "elapsedMs": 10657.903084000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 10871.147683000003,
+      "elapsedMs": 10877.529663000008
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 11169.719482,
+      "elapsedMs": 11178.354363999999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 11391.618942000001,
+      "elapsedMs": 11413.258780999997
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 11695.703188,
+      "elapsedMs": 11717.706435
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 11923.738742000001,
+      "elapsedMs": 11954.283038000009
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 12212.427596000009,
+      "elapsedMs": 12233.931902000011
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 12438.427044000011,
+      "elapsedMs": 12458.070671000009
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 13134.382933,
+      "elapsedMs": 13157.230204000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 13377.224830000006,
+      "elapsedMs": 13399.50232
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 13612.556934000007,
+      "elapsedMs": 13636.71209500001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 13908.342288,
+      "elapsedMs": 13932.209222000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 14179.492395000008,
+      "elapsedMs": 14202.750474
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 14419.166051000007,
+      "elapsedMs": 14443.941319000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 14662.312063999998,
+      "elapsedMs": 14688.580677999998
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 14939.132113,
+      "elapsedMs": 14963.499932000006
+    },
+    {
+      "kind": "observation",
+      "stepId": "5e4da1f6fb2410153cfd0429e14fe587",
+      "actual": 3,
+      "elapsedMs": 14971.723729999998
+    },
+    {
+      "kind": "step-end",
+      "stepId": "5e4da1f6fb2410153cfd0429e14fe587",
+      "status": "pass",
+      "elapsedMs": 14975.999184
+    },
+    {
+      "kind": "step-start",
+      "stepId": "8c959fe514b913e37dcc40dd60502cbd",
+      "operation": "assert-count",
+      "title": "Agent increment updates the native count",
+      "elapsedMs": 14985.419945000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 15230.325941000003,
+      "elapsedMs": 15256.551233999999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 15467.407699000003,
+      "elapsedMs": 15477.884319000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 15686.285174000004,
+      "elapsedMs": 15692.667468
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 15972.702088999999,
+      "elapsedMs": 16000.115699000002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 16277.080025000003,
+      "elapsedMs": 16313.620599000002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 16517.385382000008,
+      "elapsedMs": 16523.223501
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 16735.198287000007,
+      "elapsedMs": 16774.132706000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 17031.94150900001,
+      "elapsedMs": 17042.737355000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 17324.71117200001,
+      "elapsedMs": 17362.738830000002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 17576.489644,
+      "elapsedMs": 17615.397304
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 17854.639874,
+      "elapsedMs": 17894.166669
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 18117.545651000008,
+      "elapsedMs": 18157.231582000008
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 18393.477327,
+      "elapsedMs": 18434.944051
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 18664.064637000003,
+      "elapsedMs": 18705.70979400001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 18913.963329000006,
+      "elapsedMs": 18955.593768000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 19171.436088000002,
+      "elapsedMs": 19213.521146
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 19444.790976000004,
+      "elapsedMs": 19488.058279000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 19701.996112000008,
+      "elapsedMs": 19746.051625000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 19854.522599000004,
+      "elapsedMs": 19912.141130000004
+    },
+    {
+      "kind": "observation",
+      "stepId": "8c959fe514b913e37dcc40dd60502cbd",
+      "actual": 3,
+      "elapsedMs": 19916.752420999997
+    },
+    {
+      "kind": "assertion",
+      "stepId": "8c959fe514b913e37dcc40dd60502cbd",
+      "title": "Agent increment updates the native count",
+      "context": "",
+      "expected": 3,
+      "actual": 3,
+      "status": "pass",
+      "elapsedMs": 19921.034398000003
+    },
+    {
+      "kind": "step-start",
+      "stepId": "0f536356251f5f6b03c837c4408cbed7",
+      "operation": "assert-count",
+      "title": "Intentional mismatch: failure replay acceptance",
+      "context": "Deliberate acceptance test, not an application defect.",
+      "elapsedMs": 19929.10759700001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 20130.945340000006,
+      "elapsedMs": 20175.776490000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 20456.74392400001,
+      "elapsedMs": 20499.664833000003
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 20693.605561000004,
+      "elapsedMs": 20740.576985000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 20953.557917,
+      "elapsedMs": 20962.915401000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 21233.33797800001,
+      "elapsedMs": 21245.54121000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 21528.412903999997,
+      "elapsedMs": 21535.711748
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 21760.595168,
+      "elapsedMs": 21769.964474000008
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 21971.513569000002,
+      "elapsedMs": 21983.610753
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 22260.75791,
+      "elapsedMs": 22271.338696000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 22475.082328999997,
+      "elapsedMs": 22487.801443999997
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 22707.911065000008,
+      "elapsedMs": 22718.9899
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 22920.831445000003,
+      "elapsedMs": 22933.03359600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 23123.148247000005,
+      "elapsedMs": 23135.71022800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 23332.45889600001,
+      "elapsedMs": 23343.287585
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 23618.21338100001,
+      "elapsedMs": 23650.277090000003
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 23858.597294000007,
+      "elapsedMs": 23868.914149000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 24079.31302100001,
+      "elapsedMs": 24112.031632
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 24374.737106,
+      "elapsedMs": 24387.086370999998
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 24665.389343000003,
+      "elapsedMs": 24698.251262000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 24963.130865,
+      "elapsedMs": 24973.796229
+    },
+    {
+      "kind": "observation",
+      "stepId": "0f536356251f5f6b03c837c4408cbed7",
+      "actual": 3,
+      "elapsedMs": 25027.23461
+    },
+    {
+      "kind": "assertion",
+      "stepId": "0f536356251f5f6b03c837c4408cbed7",
+      "title": "Intentional mismatch: failure replay acceptance",
+      "context": "Deliberate acceptance test, not an application defect.",
+      "expected": 102,
+      "actual": 3,
+      "status": "fail",
+      "elapsedMs": 25032.181177000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 25204.79056400001,
+      "elapsedMs": 25214.874603999997
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 25439.28579400001,
+      "elapsedMs": 25451.582362
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 25733.716066000008,
+      "elapsedMs": 25744.838864000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 26047.254912000004,
+      "elapsedMs": 26061.709455000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 26275.44017300001,
+      "elapsedMs": 26285.622868000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 26512.434772000008,
+      "elapsedMs": 26523.93017600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 26763.89211,
+      "elapsedMs": 26773.344320999997
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 26990.47554700001,
+      "elapsedMs": 27003.385800000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 27203.28472000001,
+      "elapsedMs": 27215.720618000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 27407.539029000007,
+      "elapsedMs": 27416.84706300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 27656.188645000002,
+      "elapsedMs": 27662.429096000007
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 27944.80650800001,
+      "elapsedMs": 27956.149548
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 28181.490212999997,
+      "elapsedMs": 28192.72780600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 28472.008998000005,
+      "elapsedMs": 28483.78684900001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 28691.92074,
+      "elapsedMs": 28702.520894
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 29004.729858000006,
+      "elapsedMs": 29022.307398000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 29233.22574400001,
+      "elapsedMs": 29243.86307800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 29516.64508300001,
+      "elapsedMs": 29521.76993400001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 29727.501739,
+      "elapsedMs": 29736.625830000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 30041.939662999997,
+      "elapsedMs": 30080.973108000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 30320.29950600001,
+      "elapsedMs": 30333.64630400001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 30566.21899600001,
+      "elapsedMs": 30575.362573000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 30774.49403100001,
+      "elapsedMs": 30786.578064
+    },
+    {
+      "kind": "gap",
+      "reason": "ownership_change",
+      "status": "interrupted",
+      "elapsedMs": 31042.480758000005
+    },
+    {
+      "kind": "ownership",
+      "status": "pass",
+      "owner": "human",
+      "elapsedMs": 36193.94751500001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 41251.64654700001,
+      "elapsedMs": 41303.124301
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 41570.118846,
+      "elapsedMs": 41583.388032
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 41786.462638,
+      "elapsedMs": 41797.13250600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 42081.666304,
+      "elapsedMs": 42126.687311
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 42336.35812600001,
+      "elapsedMs": 42346.381097000005
+    },
+    {
+      "kind": "step-start",
+      "stepId": "e79182e464ca3e39994a45254ba5af5b",
+      "operation": "observe",
+      "elapsedMs": 42374.603584
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 42695.817455,
+      "elapsedMs": 42707.907051
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 42917.92533700001,
+      "elapsedMs": 42927.057465000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 43151.53555,
+      "elapsedMs": 43173.87525
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 43389.257377,
+      "elapsedMs": 43399.610704000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 43668.782213,
+      "elapsedMs": 43673.640457
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 43869.939661,
+      "elapsedMs": 43903.53330000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 44180.822985000006,
+      "elapsedMs": 44191.06716800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 44399.831022,
+      "elapsedMs": 44413.893200000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 44718.28170200001,
+      "elapsedMs": 44728.965887
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 44941.63862500001,
+      "elapsedMs": 44955.621855000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 45248.683475,
+      "elapsedMs": 45296.868951
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 45513.08709900001,
+      "elapsedMs": 45561.381078000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 45773.720830000006,
+      "elapsedMs": 45822.051737
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 46028.880066,
+      "elapsedMs": 46079.137287000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 46295.441628,
+      "elapsedMs": 46345.589387
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 46555.23100900001,
+      "elapsedMs": 46606.239183
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 46820.710236,
+      "elapsedMs": 46872.432894
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 47088.45190500001,
+      "elapsedMs": 47098.79659700001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 47350.232915,
+      "elapsedMs": 47403.661056
+    },
+    {
+      "kind": "observation",
+      "stepId": "e79182e464ca3e39994a45254ba5af5b",
+      "actual": 3,
+      "elapsedMs": 47419.252347
+    },
+    {
+      "kind": "step-end",
+      "stepId": "e79182e464ca3e39994a45254ba5af5b",
+      "status": "pass",
+      "elapsedMs": 47423.481067
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 47606.034421000004,
+      "elapsedMs": 47615.91414600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 47863.73960900001,
+      "elapsedMs": 47918.43634700001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 48123.39290200001,
+      "elapsedMs": 48133.996547
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 48391.51382800001,
+      "elapsedMs": 48451.87315300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 48670.06772400001,
+      "elapsedMs": 48680.699672
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 48915.89271,
+      "elapsedMs": 48926.40326200001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 49137.031675000006,
+      "elapsedMs": 49147.907699
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 49424.653104,
+      "elapsedMs": 49434.52970300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 49648.264908,
+      "elapsedMs": 49657.75645900001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 49962.311397,
+      "elapsedMs": 49975.853305
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 50180.085939,
+      "elapsedMs": 50189.736166
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 50474.00667,
+      "elapsedMs": 50486.91171
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 50708.454368000006,
+      "elapsedMs": 50767.866098
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 51013.66001800001,
+      "elapsedMs": 51026.239841
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 51236.682176,
+      "elapsedMs": 51243.004504
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 51523.56347000001,
+      "elapsedMs": 51536.85398900001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 51733.055487000005,
+      "elapsedMs": 51742.35508000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 52071.559056,
+      "elapsedMs": 52083.74872100001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 52302.19326500001,
+      "elapsedMs": 52311.191045
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 52586.918873,
+      "elapsedMs": 52600.774798
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 52811.95003000001,
+      "elapsedMs": 52822.61583200001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 53109.006357000006,
+      "elapsedMs": 53122.661718
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 53333.28873900001,
+      "elapsedMs": 53342.412264
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 53620.91558700001,
+      "elapsedMs": 53634.03241300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 53831.573990000004,
+      "elapsedMs": 53846.84714
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 54160.937449000005,
+      "elapsedMs": 54219.83877
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 54421.879806,
+      "elapsedMs": 54436.05579
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 54680.201285999996,
+      "elapsedMs": 54689.365997000015
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 54897.26470500001,
+      "elapsedMs": 54915.657928
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 55203.46148200001,
+      "elapsedMs": 55213.085300000006
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 55416.96358000001,
+      "elapsedMs": 55429.549857000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 55635.92665899999,
+      "elapsedMs": 55645.537583
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 55851.33654799999,
+      "elapsedMs": 55911.957781000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 56131.726234,
+      "elapsedMs": 56140.79241200001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 56356.416884000006,
+      "elapsedMs": 56362.17498899999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 56567.011843000015,
+      "elapsedMs": 56580.799532000005
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 56793.05327599999,
+      "elapsedMs": 56803.231820000015
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 56908.56447000001,
+      "elapsedMs": 56987.99961299999
+    },
+    {
+      "kind": "step-start",
+      "stepId": "13213ca8d982f00f38766e12c3eea8c8",
+      "operation": "press",
+      "elapsedMs": 56992.197245999996
+    },
+    {
+      "kind": "action-attempt",
+      "stepId": "13213ca8d982f00f38766e12c3eea8c8",
+      "status": "running",
+      "elapsedMs": 56996.52919999999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 57192.58137,
+      "elapsedMs": 57202.47098499999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 57419.833826999995,
+      "elapsedMs": 57426.36089800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 57632.75902900001,
+      "elapsedMs": 57653.06335899999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 57926.997260000004,
+      "elapsedMs": 57940.425839
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 58203.62383600001,
+      "elapsedMs": 58213.77505900001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 58469.17227400001,
+      "elapsedMs": 58521.210043
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 58742.10659499999,
+      "elapsedMs": 58802.070796000015
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 59020.835821000015,
+      "elapsedMs": 59080.00065100001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 59258.860587,
+      "elapsedMs": 59318.63070800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 59531.075262,
+      "elapsedMs": 59592.307480999996
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 59808.79619200001,
+      "elapsedMs": 59868.862324999995
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 60095.678629,
+      "elapsedMs": 60156.320206000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 60318.02728800001,
+      "elapsedMs": 60378.60373500001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 60585.151499,
+      "elapsedMs": 60644.294330000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 60852.35431699999,
+      "elapsedMs": 60912.339099000004
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 61118.726595000015,
+      "elapsedMs": 61179.03972
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 61354.05758700002,
+      "elapsedMs": 61414.898999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 61623.77027500002,
+      "elapsedMs": 61682.838917999994
+    },
+    {
+      "kind": "action",
+      "stepId": "13213ca8d982f00f38766e12c3eea8c8",
+      "status": "pass",
+      "reason": "input_acknowledged_requires_assertion",
+      "elapsedMs": 61807.02704800002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 61892.594264000014,
+      "elapsedMs": 61898.30076300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 62169.553224,
+      "elapsedMs": 62179.968171000015
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 62422.594193,
+      "elapsedMs": 62437.03284900001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 62648.388936,
+      "elapsedMs": 62654.524076
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 62869.070347,
+      "elapsedMs": 62882.10231700001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 63153.20948300001,
+      "elapsedMs": 63162.93474299999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 63366.781529,
+      "elapsedMs": 63379.16129300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 63599.96297200001,
+      "elapsedMs": 63606.350603
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 63819.124490999995,
+      "elapsedMs": 63825.00508599999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 64023.06497400001,
+      "elapsedMs": 64050.66388000001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 64262.198145,
+      "elapsedMs": 64276.149953000015
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 64747.838038000016,
+      "elapsedMs": 64777.43520400001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 64996.937353999994,
+      "elapsedMs": 65009.673532999994
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 65269.85334900001,
+      "elapsedMs": 65279.60730199999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 65573.181997,
+      "elapsedMs": 65585.96731800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 65791.47973300001,
+      "elapsedMs": 65802.889868
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 66021.74764000002,
+      "elapsedMs": 66035.012666
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 66320.884417,
+      "elapsedMs": 66331.55142500001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 66729.647806,
+      "elapsedMs": 66739.490946
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 66880.308155,
+      "elapsedMs": 66985.0257
+    },
+    {
+      "kind": "observation",
+      "stepId": "13213ca8d982f00f38766e12c3eea8c8",
+      "actual": 4,
+      "elapsedMs": 66989.12517099999
+    },
+    {
+      "kind": "step-end",
+      "stepId": "13213ca8d982f00f38766e12c3eea8c8",
+      "status": "pass",
+      "elapsedMs": 66993.57702
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 67266.987078,
+      "elapsedMs": 67279.598746
+    },
+    {
+      "kind": "step-start",
+      "stepId": "d37348dbddf756b725972eb9a2e9bf37",
+      "operation": "assert-count",
+      "title": "Human takeover increment preserves shared run",
+      "elapsedMs": 67284.55296200002
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 67515.15349900001,
+      "elapsedMs": 67525.08272
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 67790.56599,
+      "elapsedMs": 67797.35319699999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 68011.43238000001,
+      "elapsedMs": 68022.269065
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 68315.60855500001,
+      "elapsedMs": 68328.21864
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 68539.522057,
+      "elapsedMs": 68550.048393
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 68834.71431000001,
+      "elapsedMs": 68844.949212
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 69057.26567,
+      "elapsedMs": 69066.65086600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 69348.30530500002,
+      "elapsedMs": 69358.918614
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 69580.60008500001,
+      "elapsedMs": 69590.41062499999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 69889.55849699999,
+      "elapsedMs": 69923.681393
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 70137.494088,
+      "elapsedMs": 70148.00101800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 70410.729942,
+      "elapsedMs": 70420.68164600001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 70633.86181500001,
+      "elapsedMs": 70646.07506
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 70937.569254,
+      "elapsedMs": 70947.20370499999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 71161.548488,
+      "elapsedMs": 71175.71817400001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 71452.333022,
+      "elapsedMs": 71462.898131
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 71678.82704500001,
+      "elapsedMs": 71715.64521300001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 71989.364198,
+      "elapsedMs": 71998.48365800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 72200.166283,
+      "elapsedMs": 72212.97495900001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 72312.93211300002,
+      "elapsedMs": 72490.35257700001
+    },
+    {
+      "kind": "observation",
+      "stepId": "d37348dbddf756b725972eb9a2e9bf37",
+      "actual": 4,
+      "elapsedMs": 72494.58634000001
+    },
+    {
+      "kind": "assertion",
+      "stepId": "d37348dbddf756b725972eb9a2e9bf37",
+      "title": "Human takeover increment preserves shared run",
+      "context": "",
+      "expected": 4,
+      "actual": 4,
+      "status": "pass",
+      "elapsedMs": 72498.652729
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 72703.622673,
+      "elapsedMs": 72715.05271700001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 73030.56104500001,
+      "elapsedMs": 73069.74667200001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 73274.390859,
+      "elapsedMs": 73283.965199
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 73554.939763,
+      "elapsedMs": 73568.215111
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 73781.02400100001,
+      "elapsedMs": 73791.56119800001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 74081.58671999999,
+      "elapsedMs": 74095.771255
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 74289.22345700001,
+      "elapsedMs": 74298.040695
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 74592.126441,
+      "elapsedMs": 74605.40223
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 74810.897364,
+      "elapsedMs": 74851.36534700001
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 75131.026189,
+      "elapsedMs": 75142.51414099999
+    },
+    {
+      "kind": "frame",
+      "receivedElapsedMs": 75363.673625,
+      "elapsedMs": 75405.305361
+    },
+    {
+      "kind": "run-end",
+      "status": "fail",
+      "reason": "caller_stopped",
+      "elapsedMs": 75583.069759
+    }
+  ]
+}

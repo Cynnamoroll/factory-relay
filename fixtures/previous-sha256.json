@@ -1,0 +1,27 @@
+{
+  "RelayDemo/App.swift": [
+    "2c2d398dae8d46f970560896bfe6816dd22b1483c4bffafd07dc9f4c85f70dd8"
+  ],
+  "RelayDemo/RelayModel.swift": [
+    "a52911a997a94fc9778a3dc5f702c571e83d8681173f40e8f5834a3db6e42861"
+  ],
+  "RelayDemo/RelayDemoTests.swift": [
+    "fed02dbff21d8e026d5c435688bc389d8107402ef5b0d8d8633b608261659501"
+  ],
+  "RelayDemo/RelayDemo.xcodeproj/project.pbxproj": [
+    "15877c3ecd9d4fc223d901ed2f9a66c0a830bd245b3e7af979dae66441d66e58"
+  ],
+  "RelayDemo/RelayDemo.xcodeproj/xcshareddata/xcschemes/RelayDemo.xcscheme": [
+    "613c7ab95f8f1ebc624d4035fe262dcf4089c60836db58f41ba750934d664419"
+  ],
+  "RelayMac/RelayMac.xcodeproj/project.pbxproj": [
+    "713a0d9de67ed3039ce28bf3b67f01feab0af0b44fadb794d908aa9d2eb05c5d",
+    "e1de022990d28dc2b07e196de912527ca741019e9a198891b5b1b0c594c890ba"
+  ],
+  "RelayMac/RelayMac.xcodeproj/xcshareddata/xcschemes/RelayMac.xcscheme": [
+    "137fffd27264ea036ba8ac69f3563e590157342f2ed2526d51669f20ad2586c8"
+  ],
+  "RelayMac/RelayMacUITests.swift": [
+    "771126ffafb0d4f72b1b2ea84f2013394e06352fb2cb93e3c33bed38003fb4b8"
+  ]
+}

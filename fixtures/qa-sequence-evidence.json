@@ -1,0 +1,2436 @@
+{
+  "provenance": "Projection of saved acceptance journal. Identity tokens and target identity consistently anonymized; recorded timings, outcomes and association structure retained. No images, credentials or native input.",
+  "events": [
+    {
+      "kind": "run-start",
+      "actor": "agent",
+      "status": "running",
+      "target": {
+        "windowId": 1,
+        "pid": 2,
+        "bundleId": "fixture.counter"
+      },
+      "seq": 1,
+      "elapsedMs": 0.3971260000107577
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "fc54bddc026860d96a02743c3f6d7fc1",
+      "receivedElapsedMs": 0,
+      "seq": 2,
+      "elapsedMs": 81.19906199999969
+    },
+    {
+      "kind": "step-start",
+      "actor": "agent",
+      "stepId": "91beef67e1cbcc24f0ce8f6df138c380",
+      "operation": "observe",
+      "beforeFrameId": "fc54bddc026860d96a02743c3f6d7fc1",
+      "seq": 3,
+      "elapsedMs": 104.33287199999904
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e66bbb518bd0dce882e98f79543a6c57",
+      "receivedElapsedMs": 291.3236590000015,
+      "seq": 4,
+      "elapsedMs": 338.3763840000029
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "fe53dc4bed5301ef10eecf4e8e8fc608",
+      "receivedElapsedMs": 558.3886449999991,
+      "seq": 5,
+      "elapsedMs": 564.4804790000053
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a0d43cd1a1ae06f1841c155e230c14ba",
+      "receivedElapsedMs": 789.6015679999982,
+      "seq": 6,
+      "elapsedMs": 834.1917870000034
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "138772e0bc22be8c1b7fd5404a6cb699",
+      "receivedElapsedMs": 1046.4359750000003,
+      "seq": 7,
+      "elapsedMs": 1095.7805450000014
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1a598e5e27959a3e0792d2f109be4b05",
+      "receivedElapsedMs": 1305.208101000011,
+      "seq": 8,
+      "elapsedMs": 1354.361883000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b6daf30807fcad646acf155a8eb67b04",
+      "receivedElapsedMs": 1601.6897210000025,
+      "seq": 9,
+      "elapsedMs": 1651.1189100000047
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "10e58abf7ea5de28e02259c56ba69e86",
+      "receivedElapsedMs": 1868.360406000007,
+      "seq": 10,
+      "elapsedMs": 1919.0428600000014
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d99ef08fc7a8fa810620dffadc035e92",
+      "receivedElapsedMs": 2124.969590000008,
+      "seq": 11,
+      "elapsedMs": 2134.7724860000017
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "de461a25aa9002f8757352ed3d202081",
+      "receivedElapsedMs": 2351.348973,
+      "seq": 12,
+      "elapsedMs": 2361.46826400001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b0428d4bbd7d959364df789def684e55",
+      "receivedElapsedMs": 2632.7388710000087,
+      "seq": 13,
+      "elapsedMs": 2642.201217000009
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a200e1c474de800ab3730b14c0b58c2e",
+      "receivedElapsedMs": 2891.7919459999976,
+      "seq": 14,
+      "elapsedMs": 2902.4465920000075
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6386311cf135a80f3886b35f7dc9a058",
+      "receivedElapsedMs": 3112.633486000006,
+      "seq": 15,
+      "elapsedMs": 3121.8374170000025
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a8a8cb4bf79403282cfbd22ea2200bd2",
+      "receivedElapsedMs": 3407.7949760000047,
+      "seq": 16,
+      "elapsedMs": 3417.813467
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e61fd10b139852a8874046e7b72cf02d",
+      "receivedElapsedMs": 3693.4479030000075,
+      "seq": 17,
+      "elapsedMs": 3705.273138000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "c3de6a7d4048b30a7424cbfe4c221fc0",
+      "receivedElapsedMs": 3932.862064000001,
+      "seq": 18,
+      "elapsedMs": 3947.0217249999987
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6e2516be0d74d0eae3a1e4ced2195657",
+      "receivedElapsedMs": 4154.9486529999995,
+      "seq": 19,
+      "elapsedMs": 4161.248027000009
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "82ce72ea7a5b5f011cd057bf04d7fa2a",
+      "receivedElapsedMs": 4437.008520000003,
+      "seq": 20,
+      "elapsedMs": 4449.581189000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9f413a1e494fa169661d44fc2c0497dc",
+      "receivedElapsedMs": 4727.226282000003,
+      "seq": 21,
+      "elapsedMs": 4740.298520000011
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bd54ac5f2db7067c3f44daf388b7e617",
+      "receivedElapsedMs": 4976.401129999998,
+      "seq": 22,
+      "elapsedMs": 4986.927456000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "754bc34cd556dfc0411507a686215ae8",
+      "receivedElapsedMs": 5198.667767999999,
+      "seq": 23,
+      "elapsedMs": 5210.728656000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "c4cdf949bdc454a56c3987488b045d7c",
+      "receivedElapsedMs": 5385.312525000001,
+      "seq": 24,
+      "elapsedMs": 5489.702485000002
+    },
+    {
+      "kind": "observation",
+      "actor": "agent",
+      "stepId": "91beef67e1cbcc24f0ce8f6df138c380",
+      "observationId": "6593c0c1e6fcc932a397a22e0b5b1c04",
+      "actual": 2,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "fc54bddc026860d96a02743c3f6d7fc1",
+      "afterFrameId": "c4cdf949bdc454a56c3987488b045d7c",
+      "frameEvidence": {
+        "beforeFrameId": "fc54bddc026860d96a02743c3f6d7fc1",
+        "afterFrameId": "c4cdf949bdc454a56c3987488b045d7c",
+        "status": "available",
+        "correlation": "nearest received sample",
+        "frameVersion": 42,
+        "ageMs": 109
+      },
+      "seq": 25,
+      "elapsedMs": 5493.867710000006
+    },
+    {
+      "kind": "step-end",
+      "actor": "agent",
+      "stepId": "91beef67e1cbcc24f0ce8f6df138c380",
+      "status": "pass",
+      "seq": 26,
+      "elapsedMs": 5498.040288999997
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "c625cc46d524f16bc1553403d6406c17",
+      "receivedElapsedMs": 5502.754626000009,
+      "seq": 27,
+      "elapsedMs": 5511.79673300001
+    },
+    {
+      "kind": "step-start",
+      "actor": "agent",
+      "stepId": "8bd494af7a7e80e6b6a37d79947d4be7",
+      "actionId": "8a481040737fc77b69d96ff30e411b3c",
+      "operation": "press",
+      "beforeFrameId": "c625cc46d524f16bc1553403d6406c17",
+      "seq": 28,
+      "elapsedMs": 5515.83485900001
+    },
+    {
+      "kind": "action-attempt",
+      "actor": "agent",
+      "stepId": "8bd494af7a7e80e6b6a37d79947d4be7",
+      "actionId": "8a481040737fc77b69d96ff30e411b3c",
+      "status": "running",
+      "observationId": "6593c0c1e6fcc932a397a22e0b5b1c04",
+      "seq": 29,
+      "elapsedMs": 5519.855011000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6b760a6fb6a99fe4cd0bccbd344d5417",
+      "receivedElapsedMs": 5778.188876,
+      "seq": 30,
+      "elapsedMs": 5789.486620000011
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bec96b4177bd63ac1d7bd568f36c0195",
+      "receivedElapsedMs": 6018.261845000001,
+      "seq": 31,
+      "elapsedMs": 6029.56538
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "63d08f43b971ef1daa43462198bc4917",
+      "receivedElapsedMs": 6232.4404080000095,
+      "seq": 32,
+      "elapsedMs": 6243.432799000002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f2c7e99ee8310f84ad2a09333e0b209f",
+      "receivedElapsedMs": 6453.420167999997,
+      "seq": 33,
+      "elapsedMs": 6462.295131000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "91c7df05ca76473722204e91f16cbe96",
+      "receivedElapsedMs": 6683.388996000009,
+      "seq": 34,
+      "elapsedMs": 6689.475149000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ca5cec7a5f67a7e8bc38df4a64a4bc96",
+      "receivedElapsedMs": 6972.142198000001,
+      "seq": 35,
+      "elapsedMs": 6984.057302000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "aaf7190d8efc7cd58519d1558ee48879",
+      "receivedElapsedMs": 7200.495450000002,
+      "seq": 36,
+      "elapsedMs": 7210.273679999998
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e09bad00b4cc974989333689eb365189",
+      "receivedElapsedMs": 7496.888814999998,
+      "seq": 37,
+      "elapsedMs": 7512.488431000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0dd036dbf07077f647722ec89661d96b",
+      "receivedElapsedMs": 7726.35618100001,
+      "seq": 38,
+      "elapsedMs": 7736.7684020000015
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4bfcf294b2565ef94b2bd82e1f093f58",
+      "receivedElapsedMs": 8018.964554999999,
+      "seq": 39,
+      "elapsedMs": 8029.4320600000065
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4038648b8d28e2ecc47f240922637d3d",
+      "receivedElapsedMs": 8239.622311,
+      "seq": 40,
+      "elapsedMs": 8251.585756
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a00bce9b13778c70356682de406fd097",
+      "receivedElapsedMs": 8530.240967999998,
+      "seq": 41,
+      "elapsedMs": 8540.734601999997
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8b47e0d0833d087269133e83f8bac8bf",
+      "receivedElapsedMs": 8752.848477000007,
+      "seq": 42,
+      "elapsedMs": 8762.694363000002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6eab5c983504dbf3b5e38fbff936dbfe",
+      "receivedElapsedMs": 9069.763514999999,
+      "seq": 43,
+      "elapsedMs": 9083.88962300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "23a25f6169f9f328c36b7d9b46f9c999",
+      "receivedElapsedMs": 9293.225919000004,
+      "seq": 44,
+      "elapsedMs": 9304.791828000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8611872103d30cc60f614bbb61b2bdcf",
+      "receivedElapsedMs": 9580.54539900001,
+      "seq": 45,
+      "elapsedMs": 9591.546816000002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b73ad36b4f2332a19b191c49a7ee78a0",
+      "receivedElapsedMs": 9804.821041000003,
+      "seq": 46,
+      "elapsedMs": 9819.060813000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "917a92c1aca98b9fa196f84d341ace8a",
+      "receivedElapsedMs": 10110.202262000006,
+      "seq": 47,
+      "elapsedMs": 10127.938773000002
+    },
+    {
+      "kind": "action",
+      "actor": "agent",
+      "stepId": "8bd494af7a7e80e6b6a37d79947d4be7",
+      "actionId": "8a481040737fc77b69d96ff30e411b3c",
+      "status": "pass",
+      "reason": "input_acknowledged_requires_assertion",
+      "observationId": "6593c0c1e6fcc932a397a22e0b5b1c04",
+      "beforeFrameId": "c625cc46d524f16bc1553403d6406c17",
+      "seq": 48,
+      "elapsedMs": 10348.603251000008
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "575a8a37c06eddc4383b236f95affbb8",
+      "receivedElapsedMs": 10366.422728000005,
+      "seq": 49,
+      "elapsedMs": 10371.177731000003
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b64b71f5ef44e689d979ae18b6d6b1a9",
+      "receivedElapsedMs": 10641.820711000008,
+      "seq": 50,
+      "elapsedMs": 10657.903084000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d54fed9095b9ce19b182b402d4266d8f",
+      "receivedElapsedMs": 10871.147683000003,
+      "seq": 51,
+      "elapsedMs": 10877.529663000008
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "3dbc9db5c9a68750c42c924fe2121c16",
+      "receivedElapsedMs": 11169.719482,
+      "seq": 52,
+      "elapsedMs": 11178.354363999999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "058098a4f3cb3630c055db6c5bd00d21",
+      "receivedElapsedMs": 11391.618942000001,
+      "seq": 53,
+      "elapsedMs": 11413.258780999997
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9625dc7dcc4db473cc1d84ee3e49b1fc",
+      "receivedElapsedMs": 11695.703188,
+      "seq": 54,
+      "elapsedMs": 11717.706435
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1184f7bd25543e05cfd91aa77efb3dee",
+      "receivedElapsedMs": 11923.738742000001,
+      "seq": 55,
+      "elapsedMs": 11954.283038000009
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d6debd7ac2545cd0bea4a3f447edc318",
+      "receivedElapsedMs": 12212.427596000009,
+      "seq": 56,
+      "elapsedMs": 12233.931902000011
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "64c297e4570e38004979ff0e90bd1786",
+      "receivedElapsedMs": 12438.427044000011,
+      "seq": 57,
+      "elapsedMs": 12458.070671000009
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "22cd2aeae716bb316cf03480a9a4b6cf",
+      "receivedElapsedMs": 13134.382933,
+      "seq": 58,
+      "elapsedMs": 13157.230204000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9a01a52d3d4f0c5a7af09ac3256a09f7",
+      "receivedElapsedMs": 13377.224830000006,
+      "seq": 59,
+      "elapsedMs": 13399.50232
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d18720fb32c26fe8eb95e3895e229315",
+      "receivedElapsedMs": 13612.556934000007,
+      "seq": 60,
+      "elapsedMs": 13636.71209500001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6b15a6f5bc27aee95a8bc46de251e6b1",
+      "receivedElapsedMs": 13908.342288,
+      "seq": 61,
+      "elapsedMs": 13932.209222000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4439ca3fe446e1b3d81ec8cd23757721",
+      "receivedElapsedMs": 14179.492395000008,
+      "seq": 62,
+      "elapsedMs": 14202.750474
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bb58ff59185104b04d9f6c2685702187",
+      "receivedElapsedMs": 14419.166051000007,
+      "seq": 63,
+      "elapsedMs": 14443.941319000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "393d6fd7e9f00117be3586dcb58fb4aa",
+      "receivedElapsedMs": 14662.312063999998,
+      "seq": 64,
+      "elapsedMs": 14688.580677999998
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "890597db31db155781b1b2901f72d675",
+      "receivedElapsedMs": 14939.132113,
+      "seq": 65,
+      "elapsedMs": 14963.499932000006
+    },
+    {
+      "kind": "observation",
+      "actor": "agent",
+      "stepId": "8bd494af7a7e80e6b6a37d79947d4be7",
+      "actionId": "8a481040737fc77b69d96ff30e411b3c",
+      "observationId": "ac63c771a81bce33837e3e2de9c1fbec",
+      "actual": 3,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "c625cc46d524f16bc1553403d6406c17",
+      "afterFrameId": "890597db31db155781b1b2901f72d675",
+      "frameEvidence": {
+        "beforeFrameId": "c625cc46d524f16bc1553403d6406c17",
+        "afterFrameId": "890597db31db155781b1b2901f72d675",
+        "status": "available",
+        "correlation": "newer frame received after input acknowledgement; AX is assertion authority",
+        "frameVersion": 113,
+        "ageMs": 33
+      },
+      "seq": 66,
+      "elapsedMs": 14971.723729999998
+    },
+    {
+      "kind": "step-end",
+      "actor": "agent",
+      "stepId": "8bd494af7a7e80e6b6a37d79947d4be7",
+      "actionId": "8a481040737fc77b69d96ff30e411b3c",
+      "status": "pass",
+      "seq": 67,
+      "elapsedMs": 14975.999184
+    },
+    {
+      "kind": "step-start",
+      "actor": "agent",
+      "stepId": "c71ba6e1083ab1e8d11c59487e1ac099",
+      "operation": "assert-count",
+      "beforeFrameId": "890597db31db155781b1b2901f72d675",
+      "title": "Agent increment updates the native count",
+      "seq": 68,
+      "elapsedMs": 14985.419945000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "2100e8f87aabccf5d1aaafd488adaa42",
+      "receivedElapsedMs": 15230.325941000003,
+      "seq": 69,
+      "elapsedMs": 15256.551233999999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "7622a1f8840324bce1c2e6c358fbf895",
+      "receivedElapsedMs": 15467.407699000003,
+      "seq": 70,
+      "elapsedMs": 15477.884319000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9d069a642f3c8fc246baaa34fa08566e",
+      "receivedElapsedMs": 15686.285174000004,
+      "seq": 71,
+      "elapsedMs": 15692.667468
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bcb9bf1bcdc2cb155bc61af166417f95",
+      "receivedElapsedMs": 15972.702088999999,
+      "seq": 72,
+      "elapsedMs": 16000.115699000002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "10fdabe927d2164851d342c3d2c6b791",
+      "receivedElapsedMs": 16277.080025000003,
+      "seq": 73,
+      "elapsedMs": 16313.620599000002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "5d455b5739245af6a9cd77aa3550ac25",
+      "receivedElapsedMs": 16517.385382000008,
+      "seq": 74,
+      "elapsedMs": 16523.223501
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8a254512ac2945da51d96db5c93d8832",
+      "receivedElapsedMs": 16735.198287000007,
+      "seq": 75,
+      "elapsedMs": 16774.132706000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "3de801c2c7e0e17b0993326e4a1ea360",
+      "receivedElapsedMs": 17031.94150900001,
+      "seq": 76,
+      "elapsedMs": 17042.737355000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1c39496a54ebbfadee7b0dbb230ff4d0",
+      "receivedElapsedMs": 17324.71117200001,
+      "seq": 77,
+      "elapsedMs": 17362.738830000002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9a3feaafbca0662d5191a81d42e01aad",
+      "receivedElapsedMs": 17576.489644,
+      "seq": 78,
+      "elapsedMs": 17615.397304
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8d7d23185f34941675b7536904482d49",
+      "receivedElapsedMs": 17854.639874,
+      "seq": 79,
+      "elapsedMs": 17894.166669
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ad0fb61d0f8c0f85b1755fb582d4aa9b",
+      "receivedElapsedMs": 18117.545651000008,
+      "seq": 80,
+      "elapsedMs": 18157.231582000008
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "eb93607bb7f6626adc1a31b9301a5923",
+      "receivedElapsedMs": 18393.477327,
+      "seq": 81,
+      "elapsedMs": 18434.944051
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bf276b99ecd147b4852c22445290c9ba",
+      "receivedElapsedMs": 18664.064637000003,
+      "seq": 82,
+      "elapsedMs": 18705.70979400001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8537d9b9ad03de3b015065713c6ee157",
+      "receivedElapsedMs": 18913.963329000006,
+      "seq": 83,
+      "elapsedMs": 18955.593768000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4163d427905f5c7cce26aed01fcc85a8",
+      "receivedElapsedMs": 19171.436088000002,
+      "seq": 84,
+      "elapsedMs": 19213.521146
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "fafe55dee806383a4342eb35bae7a866",
+      "receivedElapsedMs": 19444.790976000004,
+      "seq": 85,
+      "elapsedMs": 19488.058279000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d80bc100d31556c32538198206af5eaf",
+      "receivedElapsedMs": 19701.996112000008,
+      "seq": 86,
+      "elapsedMs": 19746.051625000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "86439391ba127cc7bb26986d8f4e20f2",
+      "receivedElapsedMs": 19854.522599000004,
+      "seq": 87,
+      "elapsedMs": 19912.141130000004
+    },
+    {
+      "kind": "observation",
+      "actor": "agent",
+      "stepId": "c71ba6e1083ab1e8d11c59487e1ac099",
+      "observationId": "2c80d308177e0ef4150a7234b8f60216",
+      "actual": 3,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "890597db31db155781b1b2901f72d675",
+      "afterFrameId": "86439391ba127cc7bb26986d8f4e20f2",
+      "frameEvidence": {
+        "beforeFrameId": "890597db31db155781b1b2901f72d675",
+        "afterFrameId": "86439391ba127cc7bb26986d8f4e20f2",
+        "status": "available",
+        "correlation": "nearest received sample",
+        "frameVersion": 150,
+        "ageMs": 62
+      },
+      "seq": 88,
+      "elapsedMs": 19916.752420999997
+    },
+    {
+      "kind": "assertion",
+      "actor": "agent",
+      "stepId": "c71ba6e1083ab1e8d11c59487e1ac099",
+      "observationId": "2c80d308177e0ef4150a7234b8f60216",
+      "title": "Agent increment updates the native count",
+      "context": "",
+      "observationSeq": 88,
+      "expected": 3,
+      "actual": 3,
+      "status": "pass",
+      "seq": 89,
+      "elapsedMs": 19921.034398000003
+    },
+    {
+      "kind": "step-start",
+      "actor": "agent",
+      "stepId": "dcdd6f51a223683e5096f5929670b91c",
+      "operation": "assert-count",
+      "beforeFrameId": "86439391ba127cc7bb26986d8f4e20f2",
+      "title": "Intentional mismatch: failure replay acceptance",
+      "context": "Deliberate acceptance test, not an application defect.",
+      "seq": 90,
+      "elapsedMs": 19929.10759700001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d8f0c018a8523ea65c08e46bbc757c90",
+      "receivedElapsedMs": 20130.945340000006,
+      "seq": 91,
+      "elapsedMs": 20175.776490000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e3e67e46da4cb5ef400db9867035758e",
+      "receivedElapsedMs": 20456.74392400001,
+      "seq": 92,
+      "elapsedMs": 20499.664833000003
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6d9a586e01a4ca6f3adc244c43ef5797",
+      "receivedElapsedMs": 20693.605561000004,
+      "seq": 93,
+      "elapsedMs": 20740.576985000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b3a2af9c25f5199b0eb355b81ec05ee1",
+      "receivedElapsedMs": 20953.557917,
+      "seq": 94,
+      "elapsedMs": 20962.915401000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1fb80ee4b9661aeb47513bbe7894ac82",
+      "receivedElapsedMs": 21233.33797800001,
+      "seq": 95,
+      "elapsedMs": 21245.54121000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4cc0bcb640d292cba06d0069c3ca61d2",
+      "receivedElapsedMs": 21528.412903999997,
+      "seq": 96,
+      "elapsedMs": 21535.711748
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6b8456c7f635cc5fe6fbc8ce481d0420",
+      "receivedElapsedMs": 21760.595168,
+      "seq": 97,
+      "elapsedMs": 21769.964474000008
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e1cebebeba11203d6441b59213a76c12",
+      "receivedElapsedMs": 21971.513569000002,
+      "seq": 98,
+      "elapsedMs": 21983.610753
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "94cee68511d719d33156c926c6566884",
+      "receivedElapsedMs": 22260.75791,
+      "seq": 99,
+      "elapsedMs": 22271.338696000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "933bf04a27327346822b0e3ff687b909",
+      "receivedElapsedMs": 22475.082328999997,
+      "seq": 100,
+      "elapsedMs": 22487.801443999997
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6773f4010eb9dcdf542ca3a5399d0765",
+      "receivedElapsedMs": 22707.911065000008,
+      "seq": 101,
+      "elapsedMs": 22718.9899
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6486c53ebfa7b98e3e95676ebfbecc7e",
+      "receivedElapsedMs": 22920.831445000003,
+      "seq": 102,
+      "elapsedMs": 22933.03359600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f25f94fe72b1b21fb64f5aaf08d2cf48",
+      "receivedElapsedMs": 23123.148247000005,
+      "seq": 103,
+      "elapsedMs": 23135.71022800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ea3b73f26457d794dedc97f961f0be76",
+      "receivedElapsedMs": 23332.45889600001,
+      "seq": 104,
+      "elapsedMs": 23343.287585
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d8ac4b580604268d0d5643579f2ac6f5",
+      "receivedElapsedMs": 23618.21338100001,
+      "seq": 105,
+      "elapsedMs": 23650.277090000003
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "93f40318f1b82e4a944e7386fac755d9",
+      "receivedElapsedMs": 23858.597294000007,
+      "seq": 106,
+      "elapsedMs": 23868.914149000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b41483646303a44ab8fea2acfe456515",
+      "receivedElapsedMs": 24079.31302100001,
+      "seq": 107,
+      "elapsedMs": 24112.031632
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "cb9ff8fedd996b37f558f49b4e39d5a5",
+      "receivedElapsedMs": 24374.737106,
+      "seq": 108,
+      "elapsedMs": 24387.086370999998
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "5fe28043ab41bf07340530b8ef46dd18",
+      "receivedElapsedMs": 24665.389343000003,
+      "seq": 109,
+      "elapsedMs": 24698.251262000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b84b89fc7a34e7b2ccb091b024c27740",
+      "receivedElapsedMs": 24963.130865,
+      "seq": 110,
+      "elapsedMs": 24973.796229
+    },
+    {
+      "kind": "observation",
+      "actor": "agent",
+      "stepId": "dcdd6f51a223683e5096f5929670b91c",
+      "observationId": "c247c71e968d19fb9a88f8632268eabf",
+      "actual": 3,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "86439391ba127cc7bb26986d8f4e20f2",
+      "afterFrameId": "b84b89fc7a34e7b2ccb091b024c27740",
+      "frameEvidence": {
+        "beforeFrameId": "86439391ba127cc7bb26986d8f4e20f2",
+        "afterFrameId": "b84b89fc7a34e7b2ccb091b024c27740",
+        "status": "available",
+        "correlation": "nearest received sample",
+        "frameVersion": 190,
+        "ageMs": 64
+      },
+      "seq": 111,
+      "elapsedMs": 25027.23461
+    },
+    {
+      "kind": "assertion",
+      "actor": "agent",
+      "stepId": "dcdd6f51a223683e5096f5929670b91c",
+      "observationId": "c247c71e968d19fb9a88f8632268eabf",
+      "title": "Intentional mismatch: failure replay acceptance",
+      "context": "Deliberate acceptance test, not an application defect.",
+      "observationSeq": 111,
+      "expected": 102,
+      "actual": 3,
+      "status": "fail",
+      "seq": 112,
+      "elapsedMs": 25032.181177000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "5cd5edc36d009ca5626a5d0a282fb452",
+      "receivedElapsedMs": 25204.79056400001,
+      "seq": 113,
+      "elapsedMs": 25214.874603999997
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "07c3e573daeab9012a3366768f2f6de5",
+      "receivedElapsedMs": 25439.28579400001,
+      "seq": 114,
+      "elapsedMs": 25451.582362
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "707c2a7c30646d9b402052e91c9abf36",
+      "receivedElapsedMs": 25733.716066000008,
+      "seq": 115,
+      "elapsedMs": 25744.838864000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "05eb01d48cbab2d725de64888ae7a8b1",
+      "receivedElapsedMs": 26047.254912000004,
+      "seq": 116,
+      "elapsedMs": 26061.709455000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "eef8d88d7a5857168a43d2200ccc76b9",
+      "receivedElapsedMs": 26275.44017300001,
+      "seq": 117,
+      "elapsedMs": 26285.622868000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "104bae8a1f068e65ac0eb25871f53aea",
+      "receivedElapsedMs": 26512.434772000008,
+      "seq": 118,
+      "elapsedMs": 26523.93017600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "28cbd774cc9095cea1d8d731daac3ab7",
+      "receivedElapsedMs": 26763.89211,
+      "seq": 119,
+      "elapsedMs": 26773.344320999997
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4a1c09b822354d6f4e364a27a5c21481",
+      "receivedElapsedMs": 26990.47554700001,
+      "seq": 120,
+      "elapsedMs": 27003.385800000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "40f14eb8af6b33e3d46619066fe0bc97",
+      "receivedElapsedMs": 27203.28472000001,
+      "seq": 121,
+      "elapsedMs": 27215.720618000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "2592ab5182650559ea68d485e67e50d0",
+      "receivedElapsedMs": 27407.539029000007,
+      "seq": 122,
+      "elapsedMs": 27416.84706300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bbe98e14d8fd2c9ae464b4997cafb8b5",
+      "receivedElapsedMs": 27656.188645000002,
+      "seq": 123,
+      "elapsedMs": 27662.429096000007
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "57b17a2d76cc9aa05372ce15fa1ab183",
+      "receivedElapsedMs": 27944.80650800001,
+      "seq": 124,
+      "elapsedMs": 27956.149548
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e631523083759374f5335a1dc485fbd9",
+      "receivedElapsedMs": 28181.490212999997,
+      "seq": 125,
+      "elapsedMs": 28192.72780600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "55e70846299183a9558213e5df77a299",
+      "receivedElapsedMs": 28472.008998000005,
+      "seq": 126,
+      "elapsedMs": 28483.78684900001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b0822422311d1c37ef7b11adc0d555f7",
+      "receivedElapsedMs": 28691.92074,
+      "seq": 127,
+      "elapsedMs": 28702.520894
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d575908c1e8a23a78b8386324a081086",
+      "receivedElapsedMs": 29004.729858000006,
+      "seq": 128,
+      "elapsedMs": 29022.307398000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "313a74d7d868f5abc82894ae64b10cac",
+      "receivedElapsedMs": 29233.22574400001,
+      "seq": 129,
+      "elapsedMs": 29243.86307800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ff77e056432c4f11978d92fa9e1305ac",
+      "receivedElapsedMs": 29516.64508300001,
+      "seq": 130,
+      "elapsedMs": 29521.76993400001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "2ded9bb47320795907605055bdc8fbae",
+      "receivedElapsedMs": 29727.501739,
+      "seq": 131,
+      "elapsedMs": 29736.625830000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "3a5b8d90b301b7058c2f6f03a6ea5a8d",
+      "receivedElapsedMs": 30041.939662999997,
+      "seq": 132,
+      "elapsedMs": 30080.973108000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1c8499abbd0676c0587bfc30ef577620",
+      "receivedElapsedMs": 30320.29950600001,
+      "seq": 133,
+      "elapsedMs": 30333.64630400001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8fdcac14ecf9dba9e4425e459075b32e",
+      "receivedElapsedMs": 30566.21899600001,
+      "seq": 134,
+      "elapsedMs": 30575.362573000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "48f54e4cd5504dfd050e18934124033c",
+      "receivedElapsedMs": 30774.49403100001,
+      "seq": 135,
+      "elapsedMs": 30786.578064
+    },
+    {
+      "kind": "gap",
+      "actor": "human",
+      "reason": "ownership_change",
+      "status": "interrupted",
+      "seq": 136,
+      "elapsedMs": 31042.480758000005
+    },
+    {
+      "kind": "ownership",
+      "actor": "human",
+      "status": "pass",
+      "seq": 137,
+      "elapsedMs": 36193.94751500001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e213fee291bb12b78f7f7b0333276af5",
+      "receivedElapsedMs": 41251.64654700001,
+      "seq": 138,
+      "elapsedMs": 41303.124301
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "423b9664da460db09c9fccb736ae856e",
+      "receivedElapsedMs": 41570.118846,
+      "seq": 139,
+      "elapsedMs": 41583.388032
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4d1f12ee18626d4ca6ac291d5fdf9936",
+      "receivedElapsedMs": 41786.462638,
+      "seq": 140,
+      "elapsedMs": 41797.13250600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ca2cb009f01da56e15a43c2c6d7ed32b",
+      "receivedElapsedMs": 42081.666304,
+      "seq": 141,
+      "elapsedMs": 42126.687311
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9afbd22959eeb5cf71853d1a2e7373e4",
+      "receivedElapsedMs": 42336.35812600001,
+      "seq": 142,
+      "elapsedMs": 42346.381097000005
+    },
+    {
+      "kind": "step-start",
+      "actor": "human",
+      "stepId": "f847dbfe4838437c425b114c94a62c17",
+      "operation": "observe",
+      "beforeFrameId": "9afbd22959eeb5cf71853d1a2e7373e4",
+      "seq": 143,
+      "elapsedMs": 42374.603584
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a37b698eb618df29c193aaeaa3afab04",
+      "receivedElapsedMs": 42695.817455,
+      "seq": 144,
+      "elapsedMs": 42707.907051
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4c78b1c1ddb734c1633013bf294accfc",
+      "receivedElapsedMs": 42917.92533700001,
+      "seq": 145,
+      "elapsedMs": 42927.057465000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f9d811155cae5f5379fe58fc61285295",
+      "receivedElapsedMs": 43151.53555,
+      "seq": 146,
+      "elapsedMs": 43173.87525
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "73650a85d57b1f12c7f740b5cd842c26",
+      "receivedElapsedMs": 43389.257377,
+      "seq": 147,
+      "elapsedMs": 43399.610704000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "5d2d8135992ed827f387318cc27b967f",
+      "receivedElapsedMs": 43668.782213,
+      "seq": 148,
+      "elapsedMs": 43673.640457
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4471dd06a9150f8ca362da452faa37c7",
+      "receivedElapsedMs": 43869.939661,
+      "seq": 149,
+      "elapsedMs": 43903.53330000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d0e7207e11889720334a326b97b21a0f",
+      "receivedElapsedMs": 44180.822985000006,
+      "seq": 150,
+      "elapsedMs": 44191.06716800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a49b7542c70422cce0653eaf0e074cdf",
+      "receivedElapsedMs": 44399.831022,
+      "seq": 151,
+      "elapsedMs": 44413.893200000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "64690907e64943c2c8cc14e4a5806563",
+      "receivedElapsedMs": 44718.28170200001,
+      "seq": 152,
+      "elapsedMs": 44728.965887
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e1b8744627e2e08d768ee4ef55a3017c",
+      "receivedElapsedMs": 44941.63862500001,
+      "seq": 153,
+      "elapsedMs": 44955.621855000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "64b02c03a9a70858e348152043c34ab9",
+      "receivedElapsedMs": 45248.683475,
+      "seq": 154,
+      "elapsedMs": 45296.868951
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "36c03668436f648e4de52776fe0b5fb7",
+      "receivedElapsedMs": 45513.08709900001,
+      "seq": 155,
+      "elapsedMs": 45561.381078000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f44206a0fe325aa14f119cbb4a2c55fd",
+      "receivedElapsedMs": 45773.720830000006,
+      "seq": 156,
+      "elapsedMs": 45822.051737
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "2f8f1d03f5ee9974be9bde4c5827157a",
+      "receivedElapsedMs": 46028.880066,
+      "seq": 157,
+      "elapsedMs": 46079.137287000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4abbc0a2ab7c053f18958976b89b3e99",
+      "receivedElapsedMs": 46295.441628,
+      "seq": 158,
+      "elapsedMs": 46345.589387
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "013f3eaea3618ccf8c0a568ae91d40e1",
+      "receivedElapsedMs": 46555.23100900001,
+      "seq": 159,
+      "elapsedMs": 46606.239183
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "2d7e53eb55cceada4d40baaf8bbb4dbf",
+      "receivedElapsedMs": 46820.710236,
+      "seq": 160,
+      "elapsedMs": 46872.432894
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "7c4a89c278c89130a25481b13b4f59e0",
+      "receivedElapsedMs": 47088.45190500001,
+      "seq": 161,
+      "elapsedMs": 47098.79659700001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "7a897c8269bb38ed4165f6a7f9c469e1",
+      "receivedElapsedMs": 47350.232915,
+      "seq": 162,
+      "elapsedMs": 47403.661056
+    },
+    {
+      "kind": "observation",
+      "actor": "human",
+      "stepId": "f847dbfe4838437c425b114c94a62c17",
+      "observationId": "a744cc7967e7d8ea77368ebdb64be7fb",
+      "actual": 3,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "9afbd22959eeb5cf71853d1a2e7373e4",
+      "afterFrameId": "7a897c8269bb38ed4165f6a7f9c469e1",
+      "frameEvidence": {
+        "beforeFrameId": "9afbd22959eeb5cf71853d1a2e7373e4",
+        "afterFrameId": "7a897c8269bb38ed4165f6a7f9c469e1",
+        "status": "available",
+        "correlation": "nearest received sample",
+        "frameVersion": 282,
+        "ageMs": 69
+      },
+      "seq": 163,
+      "elapsedMs": 47419.252347
+    },
+    {
+      "kind": "step-end",
+      "actor": "human",
+      "stepId": "f847dbfe4838437c425b114c94a62c17",
+      "status": "pass",
+      "seq": 164,
+      "elapsedMs": 47423.481067
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "161a5548e22d97a43936650fd9a2eba9",
+      "receivedElapsedMs": 47606.034421000004,
+      "seq": 165,
+      "elapsedMs": 47615.91414600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a7629e0c86cd68ae682040e1a4141b0e",
+      "receivedElapsedMs": 47863.73960900001,
+      "seq": 166,
+      "elapsedMs": 47918.43634700001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "00d2938124b7dd011cba0a4d683eb766",
+      "receivedElapsedMs": 48123.39290200001,
+      "seq": 167,
+      "elapsedMs": 48133.996547
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ee603087037ef3ac07d953ef66c64d32",
+      "receivedElapsedMs": 48391.51382800001,
+      "seq": 168,
+      "elapsedMs": 48451.87315300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b14e64c99fa930629947440ecad6326e",
+      "receivedElapsedMs": 48670.06772400001,
+      "seq": 169,
+      "elapsedMs": 48680.699672
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d4d25e52fadd9d9029e007e7a98cde44",
+      "receivedElapsedMs": 48915.89271,
+      "seq": 170,
+      "elapsedMs": 48926.40326200001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "94a6e871154206ced5b555cd5965b9e5",
+      "receivedElapsedMs": 49137.031675000006,
+      "seq": 171,
+      "elapsedMs": 49147.907699
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "53c47e8fd197d2b85699f0fe6df2bb03",
+      "receivedElapsedMs": 49424.653104,
+      "seq": 172,
+      "elapsedMs": 49434.52970300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f8485002bbceaa9e5e5350d7627ea428",
+      "receivedElapsedMs": 49648.264908,
+      "seq": 173,
+      "elapsedMs": 49657.75645900001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bb67c8b9ce4391125d2af75cd917bc70",
+      "receivedElapsedMs": 49962.311397,
+      "seq": 174,
+      "elapsedMs": 49975.853305
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6522093b09ea259f601f7dbc70138676",
+      "receivedElapsedMs": 50180.085939,
+      "seq": 175,
+      "elapsedMs": 50189.736166
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "74dfdc1254fdccf7680b51734801b569",
+      "receivedElapsedMs": 50474.00667,
+      "seq": 176,
+      "elapsedMs": 50486.91171
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "60e77313d1c372447ad22e9a654e7d5d",
+      "receivedElapsedMs": 50708.454368000006,
+      "seq": 177,
+      "elapsedMs": 50767.866098
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "606310a245e2b3c469f2ef43a6d6a181",
+      "receivedElapsedMs": 51013.66001800001,
+      "seq": 178,
+      "elapsedMs": 51026.239841
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "80799f1808155a4d9d1f77c6430b314a",
+      "receivedElapsedMs": 51236.682176,
+      "seq": 179,
+      "elapsedMs": 51243.004504
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e2006edac440fb841300b58be63bde2a",
+      "receivedElapsedMs": 51523.56347000001,
+      "seq": 180,
+      "elapsedMs": 51536.85398900001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "75da4b6188fee646cbf3aa23c9bb0405",
+      "receivedElapsedMs": 51733.055487000005,
+      "seq": 181,
+      "elapsedMs": 51742.35508000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d32da33e182f466115e4e4357fdca031",
+      "receivedElapsedMs": 52071.559056,
+      "seq": 182,
+      "elapsedMs": 52083.74872100001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "45d95fdfc1badb71921b08c6911982af",
+      "receivedElapsedMs": 52302.19326500001,
+      "seq": 183,
+      "elapsedMs": 52311.191045
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8f2822bfee56558b117743e8cf8950fd",
+      "receivedElapsedMs": 52586.918873,
+      "seq": 184,
+      "elapsedMs": 52600.774798
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "03f8bbe4a0fa7c60a3789cdaea777b76",
+      "receivedElapsedMs": 52811.95003000001,
+      "seq": 185,
+      "elapsedMs": 52822.61583200001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "2f83d4866f778a6a480511ef618e0673",
+      "receivedElapsedMs": 53109.006357000006,
+      "seq": 186,
+      "elapsedMs": 53122.661718
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "3304116a53c4b53c3ef1b8aa26f1fef2",
+      "receivedElapsedMs": 53333.28873900001,
+      "seq": 187,
+      "elapsedMs": 53342.412264
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9a7a7cb0d87bab00e250e097a8f1925c",
+      "receivedElapsedMs": 53620.91558700001,
+      "seq": 188,
+      "elapsedMs": 53634.03241300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f7278386727bb759898c69aa92b64ad9",
+      "receivedElapsedMs": 53831.573990000004,
+      "seq": 189,
+      "elapsedMs": 53846.84714
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "66a16faac7da7d3cec68a1640c2bf38b",
+      "receivedElapsedMs": 54160.937449000005,
+      "seq": 190,
+      "elapsedMs": 54219.83877
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "14e3679a8242c7f81f2262fd5af4fc71",
+      "receivedElapsedMs": 54421.879806,
+      "seq": 191,
+      "elapsedMs": 54436.05579
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ef259c524f1270c61746840c904ee2b0",
+      "receivedElapsedMs": 54680.201285999996,
+      "seq": 192,
+      "elapsedMs": 54689.365997000015
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "3d4e4a2649a3a672061e0dad36c2dda6",
+      "receivedElapsedMs": 54897.26470500001,
+      "seq": 193,
+      "elapsedMs": 54915.657928
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "7ff833ca7aa5a6d84d3dad310b1bef52",
+      "receivedElapsedMs": 55203.46148200001,
+      "seq": 194,
+      "elapsedMs": 55213.085300000006
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d36c23ce7b62b76addc121451eca85e0",
+      "receivedElapsedMs": 55416.96358000001,
+      "seq": 195,
+      "elapsedMs": 55429.549857000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a769cc35758dc4146a477826e084ecf6",
+      "receivedElapsedMs": 55635.92665899999,
+      "seq": 196,
+      "elapsedMs": 55645.537583
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "59bcf6da15e3719087120cdfc19355d9",
+      "receivedElapsedMs": 55851.33654799999,
+      "seq": 197,
+      "elapsedMs": 55911.957781000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ff6b58fb73445fbe9974baea6d6ceaa6",
+      "receivedElapsedMs": 56131.726234,
+      "seq": 198,
+      "elapsedMs": 56140.79241200001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0661e85790226aaba7cf755b5227f4a5",
+      "receivedElapsedMs": 56356.416884000006,
+      "seq": 199,
+      "elapsedMs": 56362.17498899999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "61b169577b51cb2e5bb10e4ecf8f05be",
+      "receivedElapsedMs": 56567.011843000015,
+      "seq": 200,
+      "elapsedMs": 56580.799532000005
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bf5b8d9eb93dce426a1b3029c7dfeb26",
+      "receivedElapsedMs": 56793.05327599999,
+      "seq": 201,
+      "elapsedMs": 56803.231820000015
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4a69b748d2eece58de30a489c4bf169b",
+      "receivedElapsedMs": 56908.56447000001,
+      "seq": 202,
+      "elapsedMs": 56987.99961299999
+    },
+    {
+      "kind": "step-start",
+      "actor": "human",
+      "stepId": "40d8e676ad3805762d99e82405b875e0",
+      "actionId": "ea62ef65ecd477eca0df4ca3f595efb5",
+      "operation": "press",
+      "beforeFrameId": "4a69b748d2eece58de30a489c4bf169b",
+      "seq": 203,
+      "elapsedMs": 56992.197245999996
+    },
+    {
+      "kind": "action-attempt",
+      "actor": "human",
+      "stepId": "40d8e676ad3805762d99e82405b875e0",
+      "actionId": "ea62ef65ecd477eca0df4ca3f595efb5",
+      "status": "running",
+      "observationId": "a744cc7967e7d8ea77368ebdb64be7fb",
+      "seq": 204,
+      "elapsedMs": 56996.52919999999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0df9658336dcedbffff4753b0c06c7aa",
+      "receivedElapsedMs": 57192.58137,
+      "seq": 205,
+      "elapsedMs": 57202.47098499999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f5b9c2fdcf55238f9e68fb16c262ff82",
+      "receivedElapsedMs": 57419.833826999995,
+      "seq": 206,
+      "elapsedMs": 57426.36089800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a90390694923d2a4b2872261603d3f11",
+      "receivedElapsedMs": 57632.75902900001,
+      "seq": 207,
+      "elapsedMs": 57653.06335899999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "46fe91f6792d3a7186ddcb568f203c49",
+      "receivedElapsedMs": 57926.997260000004,
+      "seq": 208,
+      "elapsedMs": 57940.425839
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "60eaaf7f774966a523c37186041767c6",
+      "receivedElapsedMs": 58203.62383600001,
+      "seq": 209,
+      "elapsedMs": 58213.77505900001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "073337d5d2933afcc5387ce55aa07635",
+      "receivedElapsedMs": 58469.17227400001,
+      "seq": 210,
+      "elapsedMs": 58521.210043
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "a2cb432801a6d7ac43eebccdeceb3f64",
+      "receivedElapsedMs": 58742.10659499999,
+      "seq": 211,
+      "elapsedMs": 58802.070796000015
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1bfce9ea499cf7c1cd8af7a6112514b1",
+      "receivedElapsedMs": 59020.835821000015,
+      "seq": 212,
+      "elapsedMs": 59080.00065100001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "64c7e28b1188a9770605d977443493af",
+      "receivedElapsedMs": 59258.860587,
+      "seq": 213,
+      "elapsedMs": 59318.63070800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "eb3f96f3937712ea1eae68cea2cdb586",
+      "receivedElapsedMs": 59531.075262,
+      "seq": 214,
+      "elapsedMs": 59592.307480999996
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8ed092c74b2fe81fa8302a966722de67",
+      "receivedElapsedMs": 59808.79619200001,
+      "seq": 215,
+      "elapsedMs": 59868.862324999995
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b22607aaa259d092bd99f7009790cb96",
+      "receivedElapsedMs": 60095.678629,
+      "seq": 216,
+      "elapsedMs": 60156.320206000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "72b493403741bfaf27e75b72ac512742",
+      "receivedElapsedMs": 60318.02728800001,
+      "seq": 217,
+      "elapsedMs": 60378.60373500001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0bba3ed159886bfbd6e72d7342c176d8",
+      "receivedElapsedMs": 60585.151499,
+      "seq": 218,
+      "elapsedMs": 60644.294330000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "81064b86b373e18dec88a3d6a3f91043",
+      "receivedElapsedMs": 60852.35431699999,
+      "seq": 219,
+      "elapsedMs": 60912.339099000004
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4af7f94d53a5ffe941c27be3544986a9",
+      "receivedElapsedMs": 61118.726595000015,
+      "seq": 220,
+      "elapsedMs": 61179.03972
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0efe62bd3c77ca10cd215a249fa88803",
+      "receivedElapsedMs": 61354.05758700002,
+      "seq": 221,
+      "elapsedMs": 61414.898999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ecd68ac3e19c54d6cb5a6a01cbe749ed",
+      "receivedElapsedMs": 61623.77027500002,
+      "seq": 222,
+      "elapsedMs": 61682.838917999994
+    },
+    {
+      "kind": "action",
+      "actor": "human",
+      "stepId": "40d8e676ad3805762d99e82405b875e0",
+      "actionId": "ea62ef65ecd477eca0df4ca3f595efb5",
+      "status": "pass",
+      "reason": "input_acknowledged_requires_assertion",
+      "observationId": "a744cc7967e7d8ea77368ebdb64be7fb",
+      "beforeFrameId": "4a69b748d2eece58de30a489c4bf169b",
+      "seq": 223,
+      "elapsedMs": 61807.02704800002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e783364d1cbfc35c7bb5853a01a9137e",
+      "receivedElapsedMs": 61892.594264000014,
+      "seq": 224,
+      "elapsedMs": 61898.30076300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "c4daae9733add6c7e04aa3a9a5bd617d",
+      "receivedElapsedMs": 62169.553224,
+      "seq": 225,
+      "elapsedMs": 62179.968171000015
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b25a5e0e69e188fa2285c04d3fa995c4",
+      "receivedElapsedMs": 62422.594193,
+      "seq": 226,
+      "elapsedMs": 62437.03284900001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "aa43c5661e9bb26f39d592e5d4686f0f",
+      "receivedElapsedMs": 62648.388936,
+      "seq": 227,
+      "elapsedMs": 62654.524076
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f4f0c9b22b9c094c545aa12689a1a1a7",
+      "receivedElapsedMs": 62869.070347,
+      "seq": 228,
+      "elapsedMs": 62882.10231700001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6a7d8f063e5a23d199ea34886d655f3f",
+      "receivedElapsedMs": 63153.20948300001,
+      "seq": 229,
+      "elapsedMs": 63162.93474299999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "256c376877ec9949dfe4736f3e3ffc48",
+      "receivedElapsedMs": 63366.781529,
+      "seq": 230,
+      "elapsedMs": 63379.16129300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "373b215d7f1b4a5a48824a0945678e34",
+      "receivedElapsedMs": 63599.96297200001,
+      "seq": 231,
+      "elapsedMs": 63606.350603
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6e4be8b383db53ead3e79b93dab96013",
+      "receivedElapsedMs": 63819.124490999995,
+      "seq": 232,
+      "elapsedMs": 63825.00508599999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "af5c0c852520ed5db5708d65072bec62",
+      "receivedElapsedMs": 64023.06497400001,
+      "seq": 233,
+      "elapsedMs": 64050.66388000001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8cf946a4d397651c54fa1bcf4b3502a6",
+      "receivedElapsedMs": 64262.198145,
+      "seq": 234,
+      "elapsedMs": 64276.149953000015
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d7d36d9386dfb73d1810039e558da2ec",
+      "receivedElapsedMs": 64747.838038000016,
+      "seq": 235,
+      "elapsedMs": 64777.43520400001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "345aa6d4eea7d90d81d0fabdaa27943f",
+      "receivedElapsedMs": 64996.937353999994,
+      "seq": 236,
+      "elapsedMs": 65009.673532999994
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0ecebff51e75e42213c90c3b34d3b7e3",
+      "receivedElapsedMs": 65269.85334900001,
+      "seq": 237,
+      "elapsedMs": 65279.60730199999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "95ad05c4cc1d4a1c40a7e1a39acc596c",
+      "receivedElapsedMs": 65573.181997,
+      "seq": 238,
+      "elapsedMs": 65585.96731800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d5376053495eef8507a775d0584f67c6",
+      "receivedElapsedMs": 65791.47973300001,
+      "seq": 239,
+      "elapsedMs": 65802.889868
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6eff4d2c3c0e7a409255159f013c0163",
+      "receivedElapsedMs": 66021.74764000002,
+      "seq": 240,
+      "elapsedMs": 66035.012666
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9c463601383c5efa3ef089953a5de547",
+      "receivedElapsedMs": 66320.884417,
+      "seq": 241,
+      "elapsedMs": 66331.55142500001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ccd860e75e2730f2b7c3b7f1cf45c500",
+      "receivedElapsedMs": 66729.647806,
+      "seq": 242,
+      "elapsedMs": 66739.490946
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "12b82902a2cae062a81116457b0fe24f",
+      "receivedElapsedMs": 66880.308155,
+      "seq": 243,
+      "elapsedMs": 66985.0257
+    },
+    {
+      "kind": "observation",
+      "actor": "human",
+      "stepId": "40d8e676ad3805762d99e82405b875e0",
+      "actionId": "ea62ef65ecd477eca0df4ca3f595efb5",
+      "observationId": "efb2259761d98dade50a64f3903a75e5",
+      "actual": 4,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "4a69b748d2eece58de30a489c4bf169b",
+      "afterFrameId": "12b82902a2cae062a81116457b0fe24f",
+      "frameEvidence": {
+        "beforeFrameId": "4a69b748d2eece58de30a489c4bf169b",
+        "afterFrameId": "12b82902a2cae062a81116457b0fe24f",
+        "status": "available",
+        "correlation": "newer frame received after input acknowledgement; AX is assertion authority",
+        "frameVersion": 429,
+        "ageMs": 109
+      },
+      "seq": 244,
+      "elapsedMs": 66989.12517099999
+    },
+    {
+      "kind": "step-end",
+      "actor": "human",
+      "stepId": "40d8e676ad3805762d99e82405b875e0",
+      "actionId": "ea62ef65ecd477eca0df4ca3f595efb5",
+      "status": "pass",
+      "seq": 245,
+      "elapsedMs": 66993.57702
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "e1258b7c85138d7355069612f09495a5",
+      "receivedElapsedMs": 67266.987078,
+      "seq": 246,
+      "elapsedMs": 67279.598746
+    },
+    {
+      "kind": "step-start",
+      "actor": "human",
+      "stepId": "19c26db90eb6c545b01d46cd0fe8046a",
+      "operation": "assert-count",
+      "beforeFrameId": "e1258b7c85138d7355069612f09495a5",
+      "title": "Human takeover increment preserves shared run",
+      "seq": 247,
+      "elapsedMs": 67284.55296200002
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "95eaaa201815fc204f7ef1f820fcba07",
+      "receivedElapsedMs": 67515.15349900001,
+      "seq": 248,
+      "elapsedMs": 67525.08272
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1dc2de0f916fcadf17d781926a55c454",
+      "receivedElapsedMs": 67790.56599,
+      "seq": 249,
+      "elapsedMs": 67797.35319699999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6325b3b376cd95e567e6f4fa805c5999",
+      "receivedElapsedMs": 68011.43238000001,
+      "seq": 250,
+      "elapsedMs": 68022.269065
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f0d229ea272e7dc49f8c85dfc36c92df",
+      "receivedElapsedMs": 68315.60855500001,
+      "seq": 251,
+      "elapsedMs": 68328.21864
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b5bd36c8498563bea65de8b86a655523",
+      "receivedElapsedMs": 68539.522057,
+      "seq": 252,
+      "elapsedMs": 68550.048393
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9ff987ca0e5448732ecf34ccc68c761d",
+      "receivedElapsedMs": 68834.71431000001,
+      "seq": 253,
+      "elapsedMs": 68844.949212
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "086493c76acfb278f9263138bbb68d60",
+      "receivedElapsedMs": 69057.26567,
+      "seq": 254,
+      "elapsedMs": 69066.65086600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "20183664a945a4bc64df3aced5fd4527",
+      "receivedElapsedMs": 69348.30530500002,
+      "seq": 255,
+      "elapsedMs": 69358.918614
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8cfd24c710e1fb30108910d7ed1715fc",
+      "receivedElapsedMs": 69580.60008500001,
+      "seq": 256,
+      "elapsedMs": 69590.41062499999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "4149b1e44e31140cda821f072fd6c290",
+      "receivedElapsedMs": 69889.55849699999,
+      "seq": 257,
+      "elapsedMs": 69923.681393
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "fc6d4317a0410482e72f29bc542ca62b",
+      "receivedElapsedMs": 70137.494088,
+      "seq": 258,
+      "elapsedMs": 70148.00101800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ca9932cf47da0384090023b1c41e4efc",
+      "receivedElapsedMs": 70410.729942,
+      "seq": 259,
+      "elapsedMs": 70420.68164600001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "fdb952488b42724124a3609157e28ec3",
+      "receivedElapsedMs": 70633.86181500001,
+      "seq": 260,
+      "elapsedMs": 70646.07506
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "bfec1ffbbedac9b8b883b9582a95e4dc",
+      "receivedElapsedMs": 70937.569254,
+      "seq": 261,
+      "elapsedMs": 70947.20370499999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "ae0e117253d834c99a3341e22d2c8054",
+      "receivedElapsedMs": 71161.548488,
+      "seq": 262,
+      "elapsedMs": 71175.71817400001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "feef2d33416ed6ebdefb07b6fd0166cd",
+      "receivedElapsedMs": 71452.333022,
+      "seq": 263,
+      "elapsedMs": 71462.898131
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "379e65644d6e28ef332f1ed0e5173e09",
+      "receivedElapsedMs": 71678.82704500001,
+      "seq": 264,
+      "elapsedMs": 71715.64521300001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "cfbfb0939d42b6c364fb9af3909422b4",
+      "receivedElapsedMs": 71989.364198,
+      "seq": 265,
+      "elapsedMs": 71998.48365800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b76e6011a1f8d7b76da7b4bbe00ab8da",
+      "receivedElapsedMs": 72200.166283,
+      "seq": 266,
+      "elapsedMs": 72212.97495900001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "f42a5b761be2dd4eb4fce4c27c12ea37",
+      "receivedElapsedMs": 72312.93211300002,
+      "seq": 267,
+      "elapsedMs": 72490.35257700001
+    },
+    {
+      "kind": "observation",
+      "actor": "human",
+      "stepId": "19c26db90eb6c545b01d46cd0fe8046a",
+      "observationId": "7363160bc1cff2d6ddb393b988c62ab9",
+      "actual": 4,
+      "snapshot": {
+        "target": {
+          "windowId": 1,
+          "pid": 2,
+          "bundleId": "fixture.counter"
+        },
+        "processStartedAt": 1
+      },
+      "beforeFrameId": "e1258b7c85138d7355069612f09495a5",
+      "afterFrameId": "f42a5b761be2dd4eb4fce4c27c12ea37",
+      "frameEvidence": {
+        "beforeFrameId": "e1258b7c85138d7355069612f09495a5",
+        "afterFrameId": "f42a5b761be2dd4eb4fce4c27c12ea37",
+        "status": "available",
+        "correlation": "nearest received sample",
+        "frameVersion": 471,
+        "ageMs": 182
+      },
+      "seq": 268,
+      "elapsedMs": 72494.58634000001
+    },
+    {
+      "kind": "assertion",
+      "actor": "human",
+      "stepId": "19c26db90eb6c545b01d46cd0fe8046a",
+      "observationId": "7363160bc1cff2d6ddb393b988c62ab9",
+      "title": "Human takeover increment preserves shared run",
+      "context": "",
+      "observationSeq": 268,
+      "expected": 4,
+      "actual": 4,
+      "status": "pass",
+      "seq": 269,
+      "elapsedMs": 72498.652729
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "d1be9c50da59b8b99547609edb9d0a22",
+      "receivedElapsedMs": 72703.622673,
+      "seq": 270,
+      "elapsedMs": 72715.05271700001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "93e9353a331c917ab23af6ba6a1d3cde",
+      "receivedElapsedMs": 73030.56104500001,
+      "seq": 271,
+      "elapsedMs": 73069.74667200001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "1e48c7a16718f64a76023ddc7110c6e2",
+      "receivedElapsedMs": 73274.390859,
+      "seq": 272,
+      "elapsedMs": 73283.965199
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "cce635b803f8175578f6988ca2100aa9",
+      "receivedElapsedMs": 73554.939763,
+      "seq": 273,
+      "elapsedMs": 73568.215111
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "b8b1fa417438fbfa686b324e62d0889f",
+      "receivedElapsedMs": 73781.02400100001,
+      "seq": 274,
+      "elapsedMs": 73791.56119800001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "edeab57d7b00c3b66ab1bc1001036727",
+      "receivedElapsedMs": 74081.58671999999,
+      "seq": 275,
+      "elapsedMs": 74095.771255
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "6b62a06a508541417a54977c3c323b43",
+      "receivedElapsedMs": 74289.22345700001,
+      "seq": 276,
+      "elapsedMs": 74298.040695
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "8ec9bc15b0841335231aefa88d98f2ec",
+      "receivedElapsedMs": 74592.126441,
+      "seq": 277,
+      "elapsedMs": 74605.40223
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "9110cb2f702139d6d1e318e98c43f812",
+      "receivedElapsedMs": 74810.897364,
+      "seq": 278,
+      "elapsedMs": 74851.36534700001
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "0593ce70c5ece5e86c23e27d9c1387a5",
+      "receivedElapsedMs": 75131.026189,
+      "seq": 279,
+      "elapsedMs": 75142.51414099999
+    },
+    {
+      "kind": "frame",
+      "actor": "broker",
+      "frameId": "24101de45ddc8387be60af2cb72652d5",
+      "receivedElapsedMs": 75363.673625,
+      "seq": 280,
+      "elapsedMs": 75405.305361
+    },
+    {
+      "kind": "run-end",
+      "actor": "broker",
+      "status": "fail",
+      "reason": "caller_stopped",
+      "seq": 281,
+      "elapsedMs": 75583.069759
+    }
+  ]
+}

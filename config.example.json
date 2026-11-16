@@ -1,0 +1,7 @@
+{
+  "transport": "factory",
+  "computer": "your-registered-mac",
+  "workspace": "/Users/your-user/Projects/factory-relay",
+  "owner": "human:factory-relay",
+  "timeoutSeconds": 300
+}
