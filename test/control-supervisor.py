@@ -40,6 +40,10 @@ with tempfile.TemporaryDirectory() as temp:
                         return
                     body += value
                 received.append(json.loads(body))
+                if req["operation"] == "mouse":
+                    assert not (root / "control-observation.json").exists(), "Mouse authority is consumed before native dispatch"
+                    assert received[-1]["expected"]["target"] == req["target"]
+                    assert received[-1]["mouse"] == req["args"]["mouse"]
                 try:
                     with ns["private_open"](root / "lock") as lock:
                         ns["fcntl"].flock(lock, ns["fcntl"].LOCK_EX | ns["fcntl"].LOCK_NB)
@@ -83,7 +87,7 @@ with tempfile.TemporaryDirectory() as temp:
     assert not (root / "inflight").exists()
     failure("observation_stale", press)
     for bad in [
-        {**request, "target": {**target, "bundleId": "com.apple.finder"}},
+        {**request, "target": {**target, "bundleId": "com.factory.applets.host"}},
         {**request, "target": {**target, "allWindows": True}},
         {**request, "operation": "shell"},
         {**press, "args": {**press["args"], "elementId": "other"}},
@@ -121,6 +125,102 @@ with tempfile.TemporaryDirectory() as temp:
         assert (root / "inflight").exists(), "uncertain input retains fail-closed recovery"
         failure("busy", request)
         assert not (root / "control-observation.json").exists(), "uncertain input must never reuse the observation"
+        (root / "inflight").unlink()
+
+    bare = {**target, "bundleId": ""}
+    pixels = {**snapshot, "target": bare, "elements": []}
+    observe_pixels = {**request, "target": bare, "args": {**request["args"], "mode": "pixels"}}
+    def mouse_request(command):
+        observed = action(observe_pixels, {"ok": True, "result": {"type": "observation", "snapshot": pixels}})
+        return {**request, "operation": "mouse", "target": bare,
+                "args": {**request["args"], "observationId": observed["observationId"], "mouse": command}}
+    commands = [
+        {"kind": "move", "x": 0, "y": 0.999},
+        {"kind": "click", "x": 0.2, "y": 0.3, "button": "left", "count": 1},
+        {"kind": "click", "x": 0.2, "y": 0.3, "button": "right", "count": 2},
+        {"kind": "drag", "x": 0.2, "y": 0.3, "toX": 0.8, "toY": 0.3, "durationMs": 500},
+        {"kind": "scroll", "x": 0.2, "y": 0.3, "deltaX": -600, "deltaY": 600},
+    ]
+    for command in commands:
+        mouse = mouse_request(command)
+        assert action(mouse, {"ok": True, "result": {"type": "mouse-acknowledged"}})["type"] == "mouse-acknowledged"
+        failure("observation_stale", mouse)
+        assert not (root / "inflight").exists()
+    for command in [
+        {**commands[0], "x": float("nan")}, {**commands[0], "x": True},
+        {**commands[0], "y": 1}, {**commands[0], "x": -0.01},
+        {**commands[1], "button": "middle"}, {**commands[1], "count": 3},
+        {**commands[3], "durationMs": 1001}, {**commands[3], "toX": 1},
+        {**commands[4], "deltaX": 601}, {**commands[4], "shell": "invalid"},
+    ]:
+        bad = {**mouse, "args": {**mouse["args"], "mouse": command}}
+        failure("invalid_request", bad)
+    for field, value in [("owner", "agent:other"), ("workspace", "/other")]:
+        mouse = mouse_request(commands[0])
+        with ns["private_open"](root / "control-observation.json") as handle:
+            record = json.load(handle)
+            record[field] = value
+            handle.seek(0); json.dump(record, handle); handle.truncate()
+        failure("observation_stale", mouse)
+    for code in ["target_mismatch", "observation_stale"]:
+        mouse = mouse_request(commands[3])
+        failure(code, mouse, {"ok": False, "error": code})
+        assert not (root / "inflight").exists()
+        assert not (root / "control-observation.json").exists()
+    for response in [None, {"ok": False, "error": "action_uncertain"},
+                     {"ok": False, "error": "control_timeout"},
+                     {"ok": True, "result": {"type": "wrong"}}]:
+        mouse = mouse_request(commands[3])
+        try:
+            action(mouse, response)
+            raise AssertionError("uncertain mouse cannot be acknowledged")
+        except ns["Failure"]:
+            pass
+        assert (root / "inflight").exists(), "Mouse and drag uncertainty retain recovery fencing"
+        failure("busy", observe_pixels)
+        assert not (root / "control-observation.json").exists()
+        (root / "inflight").unlink()
+
+    desktop = {"kind": "desktop", "displayId": 22, "displayUUID": "abcdef12-1234-4234-8234-123456789012"}
+    display_config = {"boundsPoints": [-640, -100, 640, 400], "pixelWidth": 1280, "pixelHeight": 800,
+                      "rotation": 0, "scaleX": 2, "scaleY": 2}
+    bare = desktop
+    pixels = {"target": desktop, "displayConfiguration": display_config, "elements": []}
+    observe_pixels = {**request, "target": desktop, "args": {**request["args"], "mode": "pixels"}}
+    for command in commands:
+        mouse = mouse_request(command)
+        assert action(mouse, {"ok": True, "result": {"type": "mouse-acknowledged"}})["type"] == "mouse-acknowledged"
+        failure("observation_stale", mouse)
+    for invalid in [
+        {**desktop, "pid": 0}, {**desktop, "windowId": 1}, {**desktop, "bundleId": ""},
+        {**desktop, "displayId": True}, {**desktop, "displayId": 0}, {**desktop, "displayId": 2**32},
+        {**desktop, "displayUUID": desktop["displayUUID"].upper()},
+        {**desktop, "displayUUID": desktop["displayUUID"] + "\n"},
+        {**desktop, "displayUUID": "invalid"},
+    ]:
+        assert not ns["valid_target"](invalid)
+        failure("invalid_request", {**observe_pixels, "target": invalid})
+    failure("invalid_request", {**observe_pixels, "args": {**request["args"], "mode": "count"}})
+    failure("invalid_request", {**mouse, "operation": "press",
+            "args": {**request["args"], "observationId": "b" * 32, "elementId": "relay-increment"}})
+    for invalid in [
+        {**pixels, "processStartedAt": 0}, {**pixels, "windowRectPoints": [0, 0, 640, 400]},
+        {**pixels, "displayConfiguration": {**display_config, "pixelWidth": True}},
+        {**pixels, "displayConfiguration": {**display_config, "rotation": 360}},
+        {**pixels, "displayConfiguration": {**display_config, "boundsPoints": [0, 0, 0, 400]}},
+    ]:
+        failure("invalid_control_response", observe_pixels,
+                {"ok": True, "result": {"type": "observation", "snapshot": invalid}})
+    for response in [None, {"ok": False, "error": "action_uncertain"}, {"ok": False, "error": "control_timeout"}]:
+        mouse = mouse_request(commands[3])
+        try:
+            action(mouse, response)
+            raise AssertionError("uncertain desktop mouse cannot be acknowledged")
+        except ns["Failure"]:
+            pass
+        assert (root / "inflight").exists(), "Desktop uncertainty preserves the same recovery fence"
+        assert not (root / "control-observation.json").exists(), "Desktop observations remain single-use"
+        failure("busy", observe_pixels)
         (root / "inflight").unlink()
 
     for takeover in [False, True]:
@@ -174,4 +274,4 @@ sock.close()
     assert json.loads(proc.stdout) == {"ok": False, "error": "accessibility_required"}, proc.stdout
     assert not list(root.glob("c-*")), "control launch cleans its private socket directory"
     assert not (root / "inflight").exists()
-print("native control fencing, stale/replayed observations, uncertain input, IPC and short-lock coexistence passed")
+print("native control fencing, generic mouse validation, stale/replayed observations, uncertain input, IPC and short-lock coexistence passed")

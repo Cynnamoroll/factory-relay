@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { isId } from './qa-store.js';
+import { isId, ownedFiles, snapshotBytes, sameFile } from './qa-store.js';
 import { summarize } from './qa-contract.js';
 import { qaEditPlan, QA_EDIT_POLICY, QA_EDIT_VERSION } from '../web/qa-edit.js';
 
@@ -22,7 +22,7 @@ const stateKey = (id, variant) => variant === 'qa' ? id + ':qa' : id;
 function privateStat(file, directory = false) {
   const s = fs.lstatSync(file);
   if (s.isSymbolicLink() || s.uid !== process.getuid() || s.mode & 0o077 ||
-      (directory ? !s.isDirectory() : !s.isFile())) throw new Error('unsafe_export_storage');
+      (directory ? !s.isDirectory() : !s.isFile() || s.nlink !== 1)) throw new Error('unsafe_export_storage');
   return s;
 }
 function put(file, data) {
@@ -115,10 +115,13 @@ export class Exporter {
   constructor(store, policy = EXPORT_POLICY) {
     this.store = store; this.policy = policy; this.root = path.join(store.root, 'exports');
     this.states = new Map(); this.queue = []; this.active = null;
+    this.usage = new Map();
+    this.directories = new Map();
     fs.mkdirSync(this.root, { recursive: true, mode: 0o700 }); privateStat(this.root, true);
+    for (const id of store.deletions.keys()) store.deleteRun(id, this);
     for (const id of fs.readdirSync(this.root)) {
       if (!isId(id) || !store.runs.has(id)) throw new Error('unsafe_export_storage');
-      const dir = path.join(this.root, id); privateStat(dir, true);
+      const dir = path.join(this.root, id); this.directories.set(id, privateStat(dir, true));
       for (const name of fs.readdirSync(dir)) {
         if (!names.has(name)) throw new Error('unsafe_export_storage');
         privateStat(path.join(dir, name));
@@ -145,18 +148,57 @@ export class Exporter {
     for (const id of fs.readdirSync(this.root)) {
       if (!isId(id)) throw new Error('unsafe_export_storage');
       privateStat(path.join(this.root, id), true);
+      let bytes = 0;
       for (const name of fs.readdirSync(path.join(this.root, id))) {
         if (!names.has(name)) throw new Error('unsafe_export_storage');
-        total += privateStat(path.join(this.root, id, name)).size;
+        bytes += privateStat(path.join(this.root, id, name)).size;
       }
+      this.usage.set(id, bytes);
+      total += bytes;
     }
     return total;
+  }
+  requireIdle(id) {
+    if (this.active?.id === id || this.queue.some(job => job.id === id) ||
+        ['source', 'qa'].some(variant => ['queued', 'encoding'].includes(this.states.get(stateKey(id, variant))?.status)))
+      throw new Error('export_busy');
+  }
+  deletionFiles(id, expected) {
+    const files = ownedFiles(this.root, id, name => names.has(name), expected);
+    if (expected === undefined && (files || this.directories.has(id)) && !sameFile(files, this.directories.get(id)))
+      throw new Error('unsafe_deletion_storage');
+    return files;
+  }
+  removeFiles(id, expected) {
+    try { ownedFiles(this.root, id, name => names.has(name), expected, true); }
+    finally { this.usage.set(id, snapshotBytes(this.deletionFiles(id, expected))); }
+    this.states.delete(stateKey(id, 'source')); this.states.delete(stateKey(id, 'qa'));
+    this.usage.delete(id);
+    this.directories.delete(id);
+  }
+  usageBytes(id) {
+    if (!this.usage.has(id) || this.active?.id === id) {
+      const dir = path.join(this.root, id);
+      let bytes = 0;
+      try {
+        privateStat(dir, true);
+        for (const name of fs.readdirSync(dir)) {
+          if (!names.has(name)) throw new Error('unsafe_export_storage');
+          bytes += privateStat(path.join(dir, name)).size;
+        }
+      } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      this.usage.set(id, bytes);
+    }
+    return this.usage.get(id);
   }
   state(id, variant = 'source') { variantName('', variant); this.store.get(id); return this.states.get(stateKey(id, variant)) ?? { status: 'not_requested', retrySafe: true, ...(variant === 'qa' ? { version: QA_EDIT_VERSION } : {}) }; }
   save(id, state, variant = 'source') {
     if (variant === 'qa') state = { ...state, version: QA_EDIT_VERSION };
     const dir = path.join(this.root, id);
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); privateStat(dir, true);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const stat = privateStat(dir, true);
+    if (this.directories.has(id) && !sameFile(stat, this.directories.get(id))) throw new Error('unsafe_export_storage');
+    this.directories.set(id, stat);
     const temporary = path.join(dir, variantName('state.tmp', variant));
     put(temporary, JSON.stringify(state) + '\n');
     const fd = fs.openSync(temporary, 'r');
@@ -165,6 +207,7 @@ export class Exporter {
     if (fs.existsSync(destination)) privateStat(destination);
     fs.renameSync(temporary, destination);
     this.states.set(stateKey(id, variant), state);
+    this.usage.delete(id);
   }
   request(id, retry = false, variant = 'source') {
     const r = this.store.get(id), prior = this.state(id, variant);
@@ -190,7 +233,7 @@ export class Exporter {
       const state = { status: 'error', code: /^[a-z_]+$/.test(e.message) ? e.message : 'export_failed', retrySafe: true };
       this.states.set(stateKey(id, variant), state);
       try { this.save(id, state, variant); } catch {}
-    }).finally(() => { clearTimeout(timer); this.active = null; this.pump(); });
+    }).finally(() => { clearTimeout(timer); this.usage.delete(id); this.active = null; this.pump(); });
     this.active = { id, variant, promise, controller };
   }
   async encode(id, signal, variant = 'source') {

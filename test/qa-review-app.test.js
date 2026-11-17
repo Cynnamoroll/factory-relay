@@ -40,10 +40,10 @@ class Element extends EventTarget {
   showModal() { this.open = true; }
   close() { this.open = false; this.dispatchEvent(new Event('close')); }
   querySelectorAll(tag) { return this.children.flatMap(c => [c, ...c.querySelectorAll(tag)]).filter(c => c.tagName === tag.toUpperCase()); }
-  click() { this.dispatchEvent(new Event('click')); this.onclick?.(); }
+  click() { if (!this.disabled) { this.dispatchEvent(new Event('click')); this.onclick?.(); } }
 }
 
-async function workspace({ rejectPlay = false, storedMode = null, exportStatus = 'ready', replay, results, runs, clipboard, unpaired = false } = {}) {
+async function workspace({ rejectPlay = false, storedMode = null, exportStatus = 'ready', replay, results, runs, deletion, clipboard, unpaired = false } = {}) {
   const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
   const elements = new Map([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"[^>]*>/g)].map(([text, tag, id]) => {
     const element = new Element(tag); element.hidden = /\bhidden\b/.test(text); return [id, element];
@@ -79,7 +79,9 @@ async function workspace({ rejectPlay = false, storedMode = null, exportStatus =
         ? { ...response({ error: 'authentication_required' }), ok: false } : response({ csrf: 'test-only' });
       if (url === '/session') { unpaired = false; return response({ csrf: 'test-only' }); }
       if (url === '/api/status') return response({ windows: [], connection: 'disconnected', owner: null });
-      if (url.endsWith('qa_runs')) return response(runs ? await runs() : { total: 0, runs: [] });
+      if (url === '/api/recordings') return response(runs ? await runs() : { total: 0, runs: [] });
+      if (/\/api\/recordings\/.*\/(confirm-delete|delete)$/.test(url)) return response(deletion ? await deletion(url, input)
+        : { runId, title: recording.title, confirmation: 'test-consent' });
       if (url.endsWith('qa_report')) return response({ reportMarkdown: '### Saved QA\n\n1 passed · 1 failed\n\nExpected 102, observed 3.' });
       if (url.endsWith('qa_replay')) {
         if (input.filter === 'results') return response(results ? await results(input) : {
@@ -322,7 +324,7 @@ test('recording rows preserve long titles and expose only recorded outcomes', as
     ...recording, title, started: '2026-01-01T00:00:00Z',
   }] }) });
   const row = w.$('recording-cards').children[0];
-  assert.equal(row.attributes['aria-label'], `Review ${title}, 1 passed, 1 failed`);
+  assert.ok(row.querySelectorAll('button').some(button => button.attributes['aria-label'] === `Review ${title}, 1 passed, 1 failed`));
   assert.equal(w.$('review-outcome').textContent, '1 passed · 1 failed');
   assert.ok(!row.querySelectorAll('span').some(element => /^(FAIL|FAILED)$/.test(element.textContent)));
   assert.equal(row.querySelectorAll('h3')[0].textContent, title);
@@ -440,4 +442,90 @@ test('Escape closes playback settings and restores its trigger without changing 
   assert.equal(w.document.activeElement, w.$('playback-settings-toggle'));
   assert.equal(w.video.currentTime, time);
   assert.equal(w.video.paused, true);
+});
+
+test('recording deletion names the recording, defaults to Cancel and changes nothing when cancelled', async () => {
+  const w = await workspace({ runs: async () => ({ total: 1, runs: [{
+    ...recording, sourceBytes: 2048, exportBytes: 1024,
+    deletion: { reason: null, pending: false },
+  }], storage: { sourceBytes: 2048, exportBytes: 1024, totalBytes: 3072,
+    sourceLimitBytes: 2 * 1024 ** 3, exportLimitBytes: 512 * 1024 ** 2, maxRuns: 64 } }) });
+  assert.match(w.$('storage-usage').textContent, /3.0 KiB stored.*source 2.0 KiB.*exports 1.0 KiB/);
+  const remove = w.$('recording-cards').querySelectorAll('button').find(b => b.textContent === 'Delete');
+  remove.click(); await settle();
+  assert.equal(w.$('delete-dialog').open, true);
+  assert.equal(w.$('delete-name').textContent, recording.title);
+  assert.equal(w.document.activeElement, w.$('delete-cancel'));
+  assert.match(fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8'),
+    /permanently removes this recording’s source frames and journal, and all exported videos, posters and summaries/);
+  w.$('delete-cancel').click(); await settle();
+  assert.equal(w.$('delete-dialog').open, false);
+  assert.equal(w.requests.filter(r => r.url.endsWith('/delete')).length, 0);
+  assert.equal(w.$('run-count').textContent, 1);
+  assert.equal(w.$('recording-cards').children.length, 1);
+});
+
+test('confirmed deletion clears selected playback and details, releases displayed usage, and never requests exports', async () => {
+  let deleted = false;
+  const w = await workspace({ runs: async () => ({ total: deleted ? 0 : 1,
+    runs: deleted ? [] : [recording], storage: { sourceBytes: deleted ? 0 : 1024, exportBytes: 0,
+      totalBytes: deleted ? 0 : 1024, sourceLimitBytes: 100000, exportLimitBytes: 100000, maxRuns: 64 } }),
+    deletion: async url => {
+      if (url.endsWith('/delete')) { deleted = true; return { runId, deleted: true }; }
+      return { title: recording.title, confirmation: 'explicit-consent' };
+    } });
+  w.metadata(); await settle();
+  w.$('delete-review').click(); await settle();
+  w.$('delete-confirm').click(); await settle();
+  assert.equal(deleted, true);
+  assert.equal(w.$('review').hidden, true);
+  assert.equal(w.video.paused, true);
+  assert.equal(w.video.src, '');
+  assert.equal(w.$('checks').children.length, 0);
+  assert.equal(w.$('review-summary').textContent, '');
+  assert.equal(w.$('selected-expected').textContent, '—');
+  assert.equal(w.$('selected-actual').textContent, '—');
+  assert.equal(w.$('download').hidden, true);
+  assert.equal(w.$('source-download').hidden, true);
+  assert.equal(w.$('recording-cards').children.length, 0);
+  assert.equal(w.$('run-count').textContent, 0);
+  assert.match(w.$('storage-usage').textContent, /^0 B stored/);
+  assert.equal(w.requests.filter(r => r.url.endsWith('/delete')).length, 1);
+  assert.ok(!w.requests.some(r => r.url.endsWith('qa_report')));
+  w.metadata(); await w.poll();
+  assert.equal(w.video.paused, true, 'Late metadata and polls cannot restore deleted replay');
+});
+
+test('deletion failures remain truthful and retry the same confirmed cleanup once without regenerating exports', async () => {
+  let attempts = 0;
+  const w = await workspace({ deletion: async (url, input) => {
+    if (url.endsWith('/confirm-delete')) return { title: recording.title, confirmation: 'same-consent' };
+    assert.equal(input.confirmation, 'same-consent');
+    if (++attempts === 1) throw new Error('cleanup interrupted');
+    return { runId, deleted: true };
+  } });
+  w.$('delete-review').click(); await settle();
+  w.$('delete-confirm').click(); await settle();
+  assert.equal(w.$('delete-dialog').open, true);
+  assert.equal(w.$('review').hidden, false);
+  assert.match(w.$('delete-status').textContent, /not confirmed complete.*cleanup interrupted/);
+  assert.equal(w.$('delete-confirm').textContent, 'Retry deletion');
+  w.$('delete-confirm').click(); w.$('delete-confirm').click(); await settle();
+  assert.equal(attempts, 2);
+  assert.equal(w.$('review').hidden, true);
+  assert.equal(w.requests.filter(r => r.url.endsWith('/confirm-delete')).length, 1);
+  assert.ok(!w.requests.some(r => r.url.endsWith('qa_report')));
+});
+
+test('active and exporting row deletion is disabled with a visible explanation', async () => {
+  const w = await workspace({ runs: async () => ({ total: 2, runs: [
+    { ...recording, deletion: { reason: 'run_active' } },
+    { ...recording, runId: passId, deletion: { reason: 'export_busy' } },
+  ] }) });
+  const buttons = w.$('recording-cards').querySelectorAll('button').filter(b => b.textContent === 'Delete');
+  assert.equal(buttons.length, 2);
+  for (const b of buttons) { assert.equal(b.disabled, true); b.click(); }
+  assert.match(buttons[0].title, /Finish recording/);
+  assert.match(buttons[1].title, /queued \/ encoding/);
+  assert.equal(w.requests.filter(r => r.url.endsWith('/confirm-delete')).length, 0);
 });

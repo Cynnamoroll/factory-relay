@@ -1,5 +1,6 @@
 import { ReplayEntry } from './replay-entry.js';
 import { qaClipAt, QA_EDIT_VERSION } from './qa-edit.js';
+import { targetIdentity, targetLabel, sameTarget } from './target-identity.js';
 
 const $ = id => document.getElementById(id);
 const validId = value => /^[a-f0-9]{32}$/.test(value ?? '');
@@ -7,6 +8,7 @@ let csrf, state, observationId, selectedRun, selectedStep, checks = [], run, pag
 let tab = 'live', enteredOnce = false, lastStatusAt = 0, loadedVideo, toastTimer, reviewGeneration = 0, navigating = false;
 const video = $('video');
 let dialogState = null;
+let deletionState = null, libraryGeneration = 0;
 const clipFor = stepId => run?.edit?.clips.find(c => c.stepId === stepId);
 const replayEntry = new ReplayEntry(video, () => {
   $('replay-play').hidden = false;
@@ -24,7 +26,9 @@ async function api(route, input) {
     ...(input === undefined ? {} : { body: JSON.stringify(input) }) });
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.failure ? `${data.failure.code.replaceAll('_', ' ')}. ${data.failure.nextAction}` : data.error.replaceAll('_', ' '));
+    const error = new Error(data.failure ? `${data.failure.code.replaceAll('_', ' ')}. ${data.failure.nextAction}` : data.error.replaceAll('_', ' '));
+    error.code = data.error;
+    throw error;
   }
   return response.headers.get('content-type') === 'image/jpeg' ? response.blob() : response.json();
 }
@@ -83,14 +87,14 @@ window.addEventListener('hashchange', () => {
 function deepLink(id, step) { historyReplace(`#run=${id}${step ? '&step=' + step : ''}`); }
 function historyReplace(hash) { window.history.replaceState(null, '', location.pathname + hash); }
 bind('discover', async () => {
-  await api('/api/command', { op: 'connect' }); await updateStatus();
-  tell('Select a target only if more than one sample is available.');
+  await task('qa_targets'); await updateStatus();
+  tell('Choose a display or restricted window. With applications omitted, the default is Desktop · Main display.');
 });
 bind('start', async () => {
-  const w = state?.windows.find(w => String(w.windowId) === $('targets').value);
+  const selected = $('targets').value;
   const result = await task('qa_start', { title: $('run-title').value.trim() || 'QA run',
-    ...(w ? { target: { windowId: w.windowId, pid: w.pid, bundleId: w.bundleId } } : {}) });
-  tell(result.resumed ? 'Rejoined the current recording.' : 'QA is recording. Observe the count before input.');
+    ...(selected ? { target: JSON.parse(selected) } : {}) });
+  tell(result.resumed ? 'Rejoined the current recording.' : 'QA is recording. Observe before input.');
   await updateStatus(); await history();
 });
 bind('take', async () => {
@@ -138,23 +142,37 @@ function node(tag, className, text) {
   const n = document.createElement(tag); if (className) n.className = className;
   if (text !== undefined) n.textContent = text; return n;
 }
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  const unit = bytes < 1024 ** 2 ? 'KiB' : bytes < 1024 ** 3 ? 'MiB' : 'GiB';
+  return `${(bytes / 1024 ** ({ KiB: 1, MiB: 2, GiB: 3 }[unit])).toFixed(1)} ${unit}`;
+}
 async function history() {
+  const generation = ++libraryGeneration;
   $('library-status').hidden = false;
   $('library-status').textContent = 'Loading recordings…';
   $('recordings-empty').hidden = true;
   let result;
   try {
-    result = await task('qa_runs', { limit: 64 });
+    result = await api('/api/recordings');
   } catch (error) {
+    if (generation !== libraryGeneration) return;
     $('recordings-empty').hidden = true;
     $('library-status').textContent = `Recordings unavailable. ${error.message}. Use Refresh to retry.`;
     throw error;
   }
+  if (generation !== libraryGeneration) return;
   $('library-status').hidden = true;
   $('run-count').textContent = result.total;
+  if (result.storage) {
+    const s = result.storage;
+    $('storage-usage').textContent = `${formatBytes(s.totalBytes)} stored · source ${formatBytes(s.sourceBytes)} / ${formatBytes(s.sourceLimitBytes)} · exports ${formatBytes(s.exportBytes)} / ${formatBytes(s.exportLimitBytes)} · ${result.total} / ${s.maxRuns} recordings${s.measuringExports ? ' · export size changing' : ''}`;
+    $('storage-usage').title = `${s.totalBytes.toLocaleString()} file-content bytes. Includes source frames, journals and all generated export files. Excludes filesystem metadata and allocation overhead. Refresh updates sizes.`;
+  }
   $('recordings-empty').hidden = result.total !== 0;
   $('recording-cards').replaceChildren();
   for (const r of result.runs) {
+    const row = node('div', 'recording-row');
     const card = node('button', 'recording-card'), poster = node('div', 'card-poster');
     card.setAttribute('aria-label', `Review ${r.title}, ${r.counts.pass} passed, ${r.counts.fail} failed`);
     if (r.export.status === 'ready' && r.export.version === QA_EDIT_VERSION) {
@@ -173,9 +191,24 @@ async function history() {
     if (!['pass', 'fail', 'passed', 'failed'].includes(r.status))
       meta.append(node('span', r.status, r.status));
     meta.append(node('span', '', `${formatTime(r.edit?.durationMs ?? 0)} QA · ${new Date(r.started).toLocaleDateString()}`));
+    const size = node('span', '', formatBytes((r.sourceBytes ?? 0) + (r.exportBytes ?? 0)));
+    size.title = `Source ${formatBytes(r.sourceBytes ?? 0)} · exports ${formatBytes(r.exportBytes ?? 0)}`;
+    meta.append(size);
     body.append(meta); card.append(poster, body);
+    card.disabled = !!r.deletion?.pending;
     card.onclick = () => loadRun(r.runId).catch(e => tell(e.message));
-    $('recording-cards').append(card);
+    const actions = node('div', 'recording-actions'), remove = node('button', 'delete-recording', r.deletion?.pending ? 'Retry deletion' : 'Delete');
+    remove.setAttribute('aria-label', `Delete recording ${r.title}`);
+    remove.disabled = !!r.deletion?.reason;
+    const reason = r.deletion?.reason === 'run_active' ? 'Finish recording first'
+      : r.deletion?.reason === 'export_busy' ? 'Wait for queued / encoding exports' : '';
+    remove.title = reason || `Permanently delete ${r.title}`;
+    remove.onclick = () => openDeletion(r, remove);
+    actions.append(remove);
+    if (reason) actions.append(node('span', 'fine', reason));
+    if (r.deletion?.pending) actions.append(node('span', 'fine', 'Deletion incomplete · retry cleanup'));
+    row.append(card, actions);
+    $('recording-cards').append(row);
   }
 }
 bind('refresh', history);
@@ -184,10 +217,74 @@ function closeReview() {
   replayEntry.cancel();
   video.pause(); $('review').hidden = true; selectedRun = null; selectedStep = null; reviewGeneration++;
   historyReplace(''); loadedVideo = null; video.removeAttribute('src'); video.load();
+  video.removeAttribute('poster'); $('preview').removeAttribute('src'); $('preview').hidden = true;
+  run = null; checks = []; pageOffset = null;
+  $('checks').replaceChildren(); $('segments').replaceChildren(); $('totals').replaceChildren();
+  for (const id of ['download', 'source-download']) { $(id).removeAttribute('href'); $(id).hidden = true; }
+  for (const id of ['review-title', 'review-outcome', 'review-summary', 'findings', 'selected-title', 'selected-result', 'selected-context']) $(id).textContent = '';
+  for (const id of ['selected-expected', 'selected-actual']) $(id).textContent = '—';
+  $('review-title').title = ''; $('review').setAttribute('aria-busy', 'false');
+  $('review-details').open = false; $('playback-settings').open = false;
   navigating = false; document.body.classList.remove('reviewing');
   $('recording-cards').focus();
 }
 bind('close-review', async () => closeReview());
+async function prepareDeletion(current) {
+  $('delete-confirm').disabled = true; $('delete-retry').hidden = true;
+  $('delete-status').textContent = 'Checking recording…';
+  try {
+    const result = await api(`/api/recordings/${current.runId}/confirm-delete`, {});
+    if (deletionState !== current) return;
+    current.confirmation = result.confirmation;
+    $('delete-name').textContent = result.title;
+    $('delete-status').textContent = 'This cannot be undone.';
+    $('delete-confirm').disabled = false;
+  } catch (e) {
+    if (deletionState !== current) return;
+    $('delete-status').textContent = `Cannot delete yet: ${e.message}.`;
+    $('delete-retry').hidden = false;
+  }
+}
+function openDeletion(recording, opener) {
+  deletionState = { runId: recording.runId, opener, busy: false };
+  $('delete-name').textContent = recording.title;
+  $('delete-confirm').textContent = 'Delete permanently';
+  $('delete-cancel').disabled = false;
+  $('delete-dialog').showModal(); $('delete-cancel').focus();
+  prepareDeletion(deletionState);
+}
+bind('delete-review', async () => openDeletion({ runId: selectedRun, title: run.title }, $('delete-review')));
+$('delete-cancel').addEventListener('click', () => { if (!deletionState?.busy) $('delete-dialog').close(); });
+$('delete-dialog').addEventListener('cancel', e => { if (deletionState?.busy) e.preventDefault(); });
+$('delete-dialog').addEventListener('close', () => {
+  const previous = deletionState; deletionState = null;
+  if (previous?.opener?.isConnected) previous.opener.focus();
+  else $('recording-cards').focus();
+});
+$('delete-retry').addEventListener('click', () => { if (deletionState) prepareDeletion(deletionState); });
+$('delete-confirm').addEventListener('click', async () => {
+  const current = deletionState;
+  if (!current?.confirmation || current.busy) return;
+  current.busy = true; $('delete-confirm').disabled = true; $('delete-cancel').disabled = true;
+  $('delete-status').textContent = 'Deleting source and exports…';
+  try {
+    await api(`/api/recordings/${current.runId}/delete`, { confirmation: current.confirmation });
+  } catch (e) {
+    current.busy = false; $('delete-confirm').disabled = false; $('delete-cancel').disabled = false;
+    $('delete-confirm').textContent = 'Retry deletion';
+    $('delete-status').textContent = `Deletion is not confirmed complete: ${e.message}. Retry resumes only this recording’s cleanup.`;
+    if (e.code === 'human_confirmation_required') {
+      current.confirmation = null; $('delete-confirm').disabled = true; $('delete-retry').hidden = false;
+      $('delete-status').textContent = 'Confirmation expired. Retry check, then confirm this recording again.';
+    }
+    return;
+  }
+  $('delete-dialog').close();
+  if (selectedRun === current.runId) closeReview();
+  tell('Recording permanently deleted.');
+  try { await history(); } catch (e) { tell(`Recording deleted. Refresh the list to update storage. ${e.message}`, true); }
+  $('recording-cards').focus();
+});
 async function loadRun(id, step, refresh = false) {
   if (refresh && navigating) return;
   if (!refresh) {
@@ -229,10 +326,13 @@ async function loadRun(id, step, refresh = false) {
   $('review-outcome').textContent = `${result.counts.pass} passed · ${result.counts.fail} failed`;
   $('review-outcome').className = 'muted';
   $('failure').hidden = !result.counts.fail;
-  $('review-summary').textContent = `${['pass', 'fail', 'passed', 'failed'].includes(result.status) ? '' : result.status + ' · '}QA review ${formatTime(result.edit?.durationMs ?? 0)} · source ${formatTime(result.durationMs)} · ${result.context || 'Own RelayMac sample'}`;
+  $('review-summary').textContent = `${['pass', 'fail', 'passed', 'failed'].includes(result.status) ? '' : result.status + ' · '}QA review ${formatTime(result.edit?.durationMs ?? 0)} · source ${formatTime(result.durationMs)} · ${result.context || 'Selected application window'}`;
   $('seek').max = Math.max(0.1, (result.edit?.durationMs ?? 0) / 1000);
   $('source-download').href = `/api/runs/${id}/recording.mp4`;
   $('source-download').hidden = result.sourceExport?.status !== 'ready';
+  $('delete-review').disabled = result.status === 'running' ||
+    [result.export?.status, result.sourceExport?.status].some(s => ['queued', 'encoding'].includes(s));
+  $('delete-review').title = $('delete-review').disabled ? 'Finish recording and wait for all exports before deleting' : 'Permanently delete this recording';
   $('more-checks').hidden = pageOffset === null;
   $('totals').replaceChildren();
   for (const status of ['pass', 'fail', 'blocked', 'uncertain']) {
@@ -355,7 +455,7 @@ function seek(ms, updateHash = false) {
 function showCheck(c) {
   const clip = c ? clipFor(c.stepId) : null;
   $('selected-title').textContent = c?.title ?? 'QA check';
-  $('selected-context').textContent = `${clip ? `Assertion source ${formatTime(clip.sourceStartMs)}–${formatTime(clip.sourceEndMs)}. ${clip.evidenceNote ?? ''} ` : ''}${c?.context || c?.reason?.replaceAll('_', ' ') || ''}`;
+  $('selected-context').textContent = `${c?.kind === 'visual' ? `Visual assessment by ${c.assessment.actor}; not server-verified. ` : ''}${clip ? `Assertion source ${formatTime(clip.sourceStartMs)}–${formatTime(clip.sourceEndMs)}. ${clip.evidenceNote ?? ''} ` : ''}${c?.context || c?.reason?.replaceAll('_', ' ') || ''}`;
   $('selected-result').textContent = c ? `${c.status.toUpperCase()}${clip ? '' : ' · No QA clip'}` : 'No loaded check';
   $('selected-result').className = c?.status ?? 'muted';
   $('selected-expected').textContent = c?.expected ?? '—';
@@ -436,12 +536,12 @@ bind('fullscreen', async () => {
   await $('player-shell').requestFullscreen();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('results-dialog').open) {
+  if (e.key === 'Escape' && !$('results-dialog').open && !$('delete-dialog').open) {
     for (const id of ['review-details', 'playback-settings']) {
       if ($(id).open) { $(id).open = false; $(id + '-toggle').focus(); e.preventDefault(); return; }
     }
   }
-  if ($('results-dialog').open || tab !== 'recordings' || $('review').hidden || /INPUT|TEXTAREA|SELECT|BUTTON/.test(document.activeElement.tagName) || document.activeElement.isContentEditable || e.ctrlKey || e.metaKey || e.altKey) return;
+  if ($('results-dialog').open || $('delete-dialog').open || tab !== 'recordings' || $('review').hidden || /INPUT|TEXTAREA|SELECT|BUTTON/.test(document.activeElement.tagName) || document.activeElement.isContentEditable || e.ctrlKey || e.metaKey || e.altKey) return;
   if ([' ', 'ArrowLeft', 'ArrowRight', '[', ']', 'f'].includes(e.key)) e.preventDefault();
   if (e.key === ' ') togglePlay().catch(error => tell(error.message));
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') seek(video.currentTime * 1000 + (e.key === 'ArrowLeft' ? -5000 : 5000));
@@ -549,23 +649,27 @@ bind('dialog-copy', async () => {
 });
 function updateControls() {
   const active = Boolean(state?.runId), human = state?.owner === 'human';
+  const count = !state?.target || state.target.bundleId === 'com.factory.applets.RelayMac';
   $('start').hidden = active; $('run-setup').hidden = active;
   $('finish').disabled = !active || !human;
   $('take').hidden = !active || human;
   $('release').hidden = !active || !human;
   $('human-tools').hidden = !active || !human;
   $('observe').disabled = !active || !human;
-  $('act').disabled = !active || !human || !observationId;
-  $('check').disabled = !active || !human;
+  $('act').disabled = !active || !human || !observationId || !count;
+  $('check').disabled = !active || !human || !count;
   $('control-hint').textContent = !active ? 'Start a recording, or open a saved run in Recordings.'
-    : human ? 'You control this run. Observe before each input.' : 'Watching the agent. Take control to interact without starting a new recording.';
+    : human ? count ? 'You control this run. Observe before each input.'
+      : 'You control this run. Generic mouse and visual checks use the shared QA API; sample count controls are disabled.'
+      : 'Watching the agent. Take control to interact without starting a new recording.';
 }
 updateControls();
 async function updateStatus() {
   state = await api('/api/status'); lastStatusAt = performance.now();
   $('service').textContent = 'Local broker connected';
   $('connection').textContent = state.connection === 'live' ? 'Connected' : state.connection;
-  $('target-name').textContent = state.target ? `RelayMac · ${state.target.windowId}` : 'Own sample not selected';
+  const targets = [...(state.displays ?? []), ...state.windows];
+  $('target-name').textContent = state.target ? targetLabel(targets.find(t => sameTarget(t, state.target)) ?? state.target) : 'Target not selected';
   $('owner').textContent = state.owner === 'human' ? 'You' : state.owner === 'agent' ? 'Agent' : 'Observer only';
   $('recording').textContent = state.runId ? 'Recording' : 'Not recording';
   $('recording').className = state.runId ? 'pass' : '';
@@ -577,8 +681,8 @@ async function updateStatus() {
   if (state.owner !== 'human') observationId = undefined;
   updateControls();
   const previous = $('targets').value;
-  $('targets').replaceChildren(new Option('Auto-select the only sample', ''));
-  for (const w of state.windows) $('targets').add(new Option(`${w.title || 'RelayMac'} · ${w.windowId}`, String(w.windowId)));
+  $('targets').replaceChildren(new Option(state.desktopAllowed ? 'Desktop · Main display (default)' : 'Configured application', ''));
+  for (const target of targets) $('targets').add(new Option(targetLabel(target), JSON.stringify(targetIdentity(target))));
   $('targets').value = previous;
   if (state.frameVersion && state.frameVersion !== liveVersion && tab === 'live') {
     const blob = await api('/api/live');
@@ -595,7 +699,7 @@ async function pollStatus() {
 }
 async function pollReview() {
   try {
-    if (selectedRun && run && (run.status === 'running' || ['queued', 'encoding'].includes(run.export.status)))
+    if (!deletionState && selectedRun && run && (run.status === 'running' || ['queued', 'encoding'].includes(run.export.status)))
       await loadRun(selectedRun, null, true);
   } catch (e) { $('export-status').textContent = `Refresh unavailable. Loaded video playback is independent. ${e.message}`; }
   setTimeout(pollReview, 2000);

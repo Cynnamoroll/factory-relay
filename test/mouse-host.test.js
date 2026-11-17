@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+test('static native safety contract keeps pixels and public mouse events in the approved host', () => {
+  const control = readFileSync(new URL('../control/AppletsControl.swift', import.meta.url), 'utf8');
+  const capture = readFileSync(new URL('../host/AppletsHost.swift', import.meta.url), 'utf8');
+  const mouse = control.slice(control.indexOf('static func mouse('), control.indexOf('static func perform('));
+  assert.match(control, /\(app\.bundleIdentifier \?\? ""\) == bundleId/);
+  assert.match(control, /let started = processStartTime\(pid\)/);
+  assert.match(control, /proc_pidinfo\(pid, PROC_PIDTBSDINFO/);
+  assert.doesNotMatch(control + capture, /\.launchDate/);
+  assert.match(control, /row\[kCGWindowOwnerPID as String\] as\? Int32 == target\.pid/);
+  assert.match(control, /row\[kCGWindowLayer as String\] as\? Int == 0/);
+  assert.match(mouse, /frontmostApplication\?\.processIdentifier == expected\.target\.pid/);
+  assert.match(mouse, /top\[kCGWindowNumber as String\] as\? UInt32 == expected\.target\.windowId/);
+  assert.match(mouse, /top\[kCGWindowOwnerPID as String\] as\? Int32 == expected\.target\.pid/);
+  assert.match(mouse, /AXUIElementCopyElementAtPosition/);
+  assert.match(mouse, /hitPID == expected\.target\.pid/);
+  assert.match(mouse, /CGDisplayBounds\(\$0\)\.contains\(point\)/);
+  assert.match(mouse, /current\.windowRectPoints == expected\.windowRectPoints/);
+  assert.match(mouse, /current\.processStartedAt == expected\.processStartedAt/);
+  assert.match(mouse, /defer \{ MouseRelease\.shared\.release\(\) \}/);
+  assert.match(control, /MouseRelease\.shared\.release\(cancel: true\)\s+exit\(0\)/);
+  assert.match(control, /guard !cancelled else \{ throw ControlError\.disconnected \}/);
+  assert.match(mouse, /try post\(\.leftMouseDragged/);
+  assert.match(mouse, /if dispatched \{ throw ControlError\.uncertain \}/);
+  assert.match(mouse, /Thread\.sleep\(forTimeInterval: 0\.03\)\s+\/\/[^\n]+\n\s+MouseRelease\.shared\.release\(count: Int64\(index\)\)/,
+    'A menu opened by mouse-down must not prevent button-up or poison input fencing');
+  assert.doesNotMatch(mouse, /AXUIElementPerformAction|relay-count|relay-increment|AppleScript|System Events|Process\(/);
+  assert.match(capture, /SCContentFilter\(desktopIndependentWindow: window\)/);
+  assert.match(capture, /SCContentFilter\(display: display, excludingApplications: \[\], exceptingWindows: \[\]\)/);
+  assert.match(capture, /try await Control.identitySnapshot\(target\) == initial/);
+  assert.match(control, /CGDisplayCreateUUIDFromDisplayID/);
+  assert.match(control, /CGDisplayIsOnline\(id\)/);
+  assert.match(control, /CGDisplayIsActive\(id\)/);
+  assert.match(mouse, /current\.displayConfiguration == expected\.displayConfiguration/);
+  assert.match(mouse, /if expected\.target\.isDesktop/);
+  assert.match(mouse, /CGPreflightPostEventAccess/);
+  assert.match(capture, /config\.ignoreShadowsSingleWindow = true/);
+  assert.match(capture, /config\.showsCursor = true/);
+  assert.doesNotMatch(capture, /window\.title/, 'Discovery must not disclose document titles from unselected apps');
+  assert.doesNotMatch(capture + control, /CGRequestScreenCaptureAccess|AXIsProcessTrustedWithOptions/);
+});

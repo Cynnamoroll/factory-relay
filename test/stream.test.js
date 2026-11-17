@@ -35,7 +35,7 @@ test('frame decoder rejects length, truncation, image, sequence and geometry vio
   await assert.rejects(collect([packet(), packet()]), /invalid_stream_frame/);
   await assert.rejects(collect([packet({ ...frame, width: 2049 })]));
   await assert.rejects(collect([Buffer.alloc(IMAGE_LIMIT + HEADER_LIMIT + 65541)]), /stream_buffer_limit/);
-  assert.throws(() => streamTargetSchema.parse({ windowId: 5, pid: 12, bundleId: 'com.apple.finder' }));
+  assert.throws(() => streamTargetSchema.parse({ windowId: 5, pid: 12, bundleId: 'com.apple.*' }));
 });
 
 test('DeviceHub is an explicit window identity, not an application-wide or guessed-device selector', async () => {
@@ -43,7 +43,7 @@ test('DeviceHub is an explicit window identity, not an application-wide or guess
   assert.deepEqual(streamTargetSchema.parse(target), target);
   for (const invalid of [
     { bundleId: target.bundleId }, { ...target, windowId: 0 }, { ...target, allWindows: true },
-    { ...target, udid: '35BD5396-ABA0-446F-8757-3DA383C1207B' }, { ...target, bundleId: 'com.apple.dt.Xcode' },
+    { ...target, udid: '35BD5396-ABA0-446F-8757-3DA383C1207B' }, { ...target, bundleId: 'com.apple.dt.Xcode\n' },
   ]) assert.throws(() => streamTargetSchema.parse(invalid));
   assert.equal((await collect([packet({ ...frame, ...target })]))[0].header.bundleId, target.bundleId);
 });

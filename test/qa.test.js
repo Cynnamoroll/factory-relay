@@ -25,7 +25,7 @@ function fake() {
     externalTakeover: () => { generation++; },
     acquire: async takeover => { calls.push(['acquire', takeover]); return { token: 'a'.repeat(64), generation: ++generation }; },
     release: async lease => { verify(lease); calls.push(['release']); generation++; },
-    windows: async () => [target],
+    windows: async () => { calls.push(['windows']); return [target]; },
     stream: async (lease, selected, signal, consume) => {
       verify(lease); active++; calls.push(['stream']); callback = consume;
       emit();
@@ -44,9 +44,9 @@ function fake() {
     },
   };
 }
-function fixture(t, policy) {
+function fixture(t, policy, options = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'applets-qa-test-'));
-  const store = new RunStore(root, policy), native = fake(), broker = new Broker(store, native, { frameWaitMs: 25 });
+  const store = new RunStore(root, policy), native = fake(), broker = new Broker(store, native, { frameWaitMs: 25, ...options });
   t.after(async () => { await broker.close(); fs.rmSync(root, { recursive: true }); });
   return { root, store, native, broker };
 }
@@ -117,7 +117,7 @@ test('agent cannot use stale broker lease to take over an external owner', async
 test('human can explicitly take control before discovery and then start without re-taking on reload', async t => {
   const { broker } = fixture(t);
   await broker.task('human', 'qa_control', { mode: 'take' });
-  const started = await broker.task('human', 'qa_start', { title: 'Human-owned run' });
+  const started = await broker.task('human', 'qa_start', { applicationId: 'relaymac', title: 'Human-owned run' });
   assert.deepEqual(started.target, target);
   const resumed = await broker.task('human', 'qa_start', { resumeRunId: started.runId });
   assert.equal(resumed.resumed, true);
@@ -311,9 +311,12 @@ test('official MCP client joins the same broker, hides grants, returns shared pi
   await client.connect(transport);
   const tools = (await client.listTools()).tools;
   assert.deepEqual(tools.map(t => t.name).sort(),
-    ['qa_act', 'qa_check', 'qa_finish', 'qa_observe', 'qa_replay', 'qa_report', 'qa_runs', 'qa_start', 'qa_status']);
-  for (const tool of tools) assert.equal(tool.inputSchema.additionalProperties, false);
-  assert.deepEqual(tools.find(t => t.name === 'qa_act').inputSchema.properties.action.const, 'increment');
+    ['qa_act', 'qa_check', 'qa_finish', 'qa_observe', 'qa_replay', 'qa_report', 'qa_runs', 'qa_start', 'qa_status', 'qa_targets']);
+  for (const tool of tools)
+    for (const schema of tool.inputSchema.anyOf ?? tool.inputSchema.oneOf ?? [tool.inputSchema])
+      assert.equal(schema.additionalProperties, false);
+  assert.match(JSON.stringify(tools.find(t => t.name === 'qa_act').inputSchema), /increment/);
+  assert.match(JSON.stringify(tools.find(t => t.name === 'qa_act').inputSchema), /mouse/);
   const call = async (name, args = {}) => {
     const reply = await client.callTool({ name, arguments: args });
     assert.ok(!reply.isError, JSON.stringify(reply));
@@ -321,7 +324,15 @@ test('official MCP client joins the same broker, hides grants, returns shared pi
     assert.deepEqual(reply.structuredContent, JSON.parse(reply.content[0].text));
     return JSON.parse(reply.content[0].text);
   };
-  const taken = await call('qa_start', { title: 'Named sample checks' });
+  const status = await call('qa_status');
+  assert.deepEqual(status.applications, [{
+    id: 'relaymac', name: 'RelayMac', platform: 'macos', bundleId: target.bundleId,
+    capabilities: { sharedQA: true, observe: ['pixels', 'count'], act: ['mouse', 'increment'], check: ['visual', 'count'], recording: true },
+  }]);
+  assert.equal(status.connection, 'disconnected', 'Capabilities describe implemented support, not runtime readiness');
+  assert.deepEqual(native.calls, [], 'Reading capabilities via MCP never acquires or discovers native state');
+  const taken = await call('qa_start', { applicationId: 'relaymac', title: 'Named sample checks' });
+  assert.equal(taken.applicationId, 'relaymac');
   assert.equal(taken.controller, 'agent');
   assert.equal(taken.grant, undefined, 'MCP responses must not disclose mutation credentials');
   const { runId } = taken;
@@ -357,4 +368,114 @@ test('official MCP client joins the same broker, hides grants, returns shared pi
   assert.equal(finished.status, 'fail');
   assert.match(finished.reportMarkdown, /Intentional mismatch for replay/);
   assert.equal(broker.owner, null);
+});
+
+const sampleProfile = { id: 'sample', name: 'My sample', platform: 'macos', bundleId: target.bundleId };
+const otherProfile = { id: 'editor', name: 'Editor', platform: 'macos', bundleId: 'com.example.Editor' };
+test('configured profiles replace defaults and unsupported, unknown and ambiguous starts have zero native calls', async t => {
+  for (const [applications, args, error] of [
+    [[], {}, 'application_unavailable'],
+    [[otherProfile], { applicationId: 'relaymac' }, 'unknown_application'],
+    [[sampleProfile, otherProfile], {}, 'application_ambiguous'],
+    [[sampleProfile, otherProfile], { applicationId: 'editor', target }, 'application_mismatch'],
+    [[{ ...otherProfile, platform: 'ios-simulator', bundleId: target.bundleId,
+      simulatorUdid: 'abcdef12-1234-4234-8234-123456789012' }], {}, 'application_not_supported'],
+  ]) {
+    const { broker, native } = fixture(t, undefined, { applications });
+    assert.deepEqual((await broker.task('agent', 'qa_status', {})).applications.map(({ capabilities, ...p }) => p), applications);
+    await assert.rejects(broker.task('agent', 'qa_start', args), new RegExp(error));
+    assert.deepEqual(native.calls, [], `${error} must precede lease acquisition and native discovery`);
+  }
+});
+
+test('explicit sample profile supports count checks and persists identity for safe resume', async t => {
+  const { broker, store, native } = fixture(t, undefined, { applications: [sampleProfile, otherProfile] });
+  const started = await broker.task('agent', 'qa_start', { applicationId: 'sample', title: 'Explicit app' });
+  assert.equal(started.applicationId, 'sample');
+  assert.deepEqual(started.application, sampleProfile);
+  assert.equal(store.get(started.runId).events[0].labels.applicationId, 'sample');
+  const before = await broker.task('agent', 'qa_observe', { runId: started.runId });
+  await broker.task('agent', 'qa_act', { runId: started.runId, action: 'increment', observationId: before.observationId });
+  assert.equal((await broker.task('agent', 'qa_check', { runId: started.runId, title: 'Adds one', expected: before.actual + 1 })).status, 'pass');
+  const calls = native.calls.length;
+  assert.equal((await broker.task('agent', 'qa_start', { resumeRunId: started.runId })).applicationId, 'sample');
+  await assert.rejects(broker.task('agent', 'qa_start', { applicationId: 'editor', resumeRunId: started.runId }), /application_mismatch/);
+  await assert.rejects(broker.task('agent', 'qa_start', { target: { ...target, pid: 99 } }), /target_mismatch/);
+  assert.equal(native.calls.length, calls, 'Resume identity checks never send native operations');
+});
+
+test('legacy target selects the unique configured Mac profile and old run labels can still resume', async t => {
+  const { broker, native, store } = fixture(t, undefined, { applications: [sampleProfile, otherProfile] });
+  const started = await broker.task('agent', 'qa_start', { target });
+  assert.equal(started.applicationId, 'sample');
+  await broker.command('agent', { op: 'stop', grant: broker.owner.grant });
+  broker.active = store.start(target, { title: 'Legacy run without applicationId' }, 'agent');
+  const calls = native.calls.length;
+  const resumed = await broker.task('agent', 'qa_start', { resumeRunId: broker.active.id });
+  assert.equal(resumed.applicationId, 'sample');
+  await assert.rejects(broker.task('agent', 'qa_start', { applicationId: 'editor' }), /application_mismatch/);
+  assert.equal(native.calls.length, calls);
+});
+
+test('HTTP generic Mac profile status is read-only, private and does not claim runtime readiness', async t => {
+  const { broker, native } = fixture(t, undefined, { applications: [otherProfile] });
+  const service = createQAServer(broker), origin = await service.listen(0);
+  t.after(() => service.close());
+  const response = await fetch(origin + '/api/status', { headers: {
+    Authorization: `Bearer ${service.agentToken}`, 'X-QA-Request': '1',
+  } });
+  const status = await response.json();
+  assert.deepEqual(status.applications, [{ ...otherProfile, capabilities: {
+    sharedQA: true, observe: ['pixels'], act: ['mouse'], check: ['visual'], recording: true,
+  } }]);
+  assert.deepEqual(status.windows, []);
+  assert.equal(status.target, null);
+  assert.equal(status.connection, 'disconnected');
+  assert.deepEqual(native.calls, []);
+  assert.ok(!JSON.stringify(status).includes(service.agentToken));
+});
+
+test('legacy browser commands cannot bypass explicit authorization even with a sample-capable adapter', async t => {
+  for (const applications of [[], [{ ...otherProfile, platform: 'ios-simulator',
+    simulatorUdid: 'abcdef12-1234-4234-8234-123456789012' }]]) {
+    const { broker, native } = fixture(t, undefined, { applications });
+    for (const command of [{ op: 'connect' }, { op: 'take', takeover: true }, { op: 'select', target }])
+      await assert.rejects(broker.command('human', command), /application_not_authorized/);
+    assert.deepEqual(native.calls, [], 'Denied legacy paths never acquire, enumerate, stream or act');
+  }
+});
+
+test('MCP configured profile errors precede native access and explicit selection exposes ten tools', async t => {
+  const { root, broker, native } = fixture(t, undefined, { applications: [sampleProfile, otherProfile] });
+  const service = createQAServer(broker), origin = await service.listen(0);
+  const credentials = path.join(root, 'agent.json');
+  fs.writeFileSync(credentials, JSON.stringify({ origin, token: service.agentToken }), { mode: 0o600 });
+  const client = new Client({ name: 'profile-selection-test', version: '1' });
+  t.after(async () => { await client.close(); await service.close(); });
+  await client.connect(new StdioClientTransport({ command: process.execPath,
+    args: [fileURLToPath(new URL('../src/qa-mcp.js', import.meta.url)), credentials], stderr: 'pipe' }));
+  assert.equal((await client.listTools()).tools.length, 10);
+  const status = await client.callTool({ name: 'qa_status', arguments: {} });
+  assert.deepEqual(status.structuredContent.applications[1].capabilities.act, ['mouse']);
+  for (const [args, code, category] of [
+    [{}, 'application_ambiguous', 'validation'],
+    [{ applicationId: 'missing' }, 'unknown_application', 'validation'],
+    [{ applicationId: '../sample' }, 'invalid_arguments', 'validation'],
+  ]) {
+    const reply = await client.callTool({ name: 'qa_start', arguments: args });
+    assert.equal(reply.isError, true);
+    if (code === 'invalid_arguments') continue;
+    assert.equal(reply.structuredContent.error.code, code);
+    assert.equal(reply.structuredContent.error.category, category);
+    assert.ok(!JSON.stringify(reply).includes(service.agentToken));
+  }
+  assert.deepEqual(native.calls, []);
+  const started = await client.callTool({ name: 'qa_start', arguments: { applicationId: 'sample' } });
+  assert.ok(!started.isError, JSON.stringify(started));
+  assert.deepEqual(started.structuredContent.application, sampleProfile);
+  assert.ok(native.calls.some(([op]) => op === 'windows'), 'An authorized start actually discovers sample windows');
+  const check = await client.callTool({ name: 'qa_check', arguments: {
+    runId: started.structuredContent.runId, title: 'Explicit sample count', expected: 0,
+  } });
+  assert.equal(check.structuredContent.status, 'pass');
 });
