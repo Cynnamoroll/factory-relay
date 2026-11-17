@@ -88,6 +88,16 @@ details p { margin-top: 8px; }
 #library .card-body p, #library .card-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; color: var(--muted); }
 #library .recordings-empty { padding: 48px 20px; }
 #library-status { padding: 8px 14px; }
+#storage-usage { padding: 0 14px 10px; }
+.recording-row { display: flex; align-items: center; border-bottom: 1px solid var(--divider); }
+#library .recording-row .recording-card { flex: 1; min-width: 0; border-bottom: 0; }
+.recording-actions { display: flex; flex-direction: column; align-items: end; gap: 4px; padding: 8px 14px 8px 0; max-width: 160px; text-align: right; }
+.delete-recording, #review .menu-body .delete-recording { color: var(--red); }
+#delete-dialog { width: min(440px,calc(100vw - 24px)); padding: 0; border: 1px solid #494949; border-radius: 5px; color: #e5e5e5; background: var(--panel); }
+#delete-dialog::backdrop { background: #000a; }
+#delete-dialog p { margin-top: 12px; font-size: 12px; overflow-wrap: anywhere; }
+#delete-name { font-weight: 600; }
+#delete-status { color: var(--muted); }
 body.reviewing #library, body.reviewing .workspace-help { display: none; }
 .pass { color: var(--green); }
 .fail, .failed { color: var(--red); }

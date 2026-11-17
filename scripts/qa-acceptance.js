@@ -20,7 +20,7 @@ try {
     assert.ok(selected, 'Explicit window must be a freshly discovered own RelayMac target');
     const { windowId, pid, bundleId } = selected; target = { windowId, pid, bundleId };
   }
-  ({ runId } = await client.task('qa_start', { title: 'Shared human and agent QA acceptance',
+  ({ runId } = await client.task('qa_start', { applicationId: 'relaymac', title: 'Shared human and agent QA acceptance',
     context: 'Operator acceptance; includes an explicitly intentional assertion mismatch', ...(target ? { target } : {}) }));
   const before = await client.task('qa_observe', { runId });
   const after = await client.task('qa_act', { runId, action: 'increment', observationId: before.observationId });

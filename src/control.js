@@ -3,28 +3,34 @@ import { spawn } from 'node:child_process';
 import { z } from 'zod';
 import { configSchema } from './schema.js';
 import { quote } from './transport.js';
+import { windowTargetSchema, desktopTargetSchema, displayConfigurationSchema, macBundleIdSchema, sampleBundle } from './window-target.js';
+import { mouseSchema } from './mouse.js';
 
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-export const controlTargetSchema = z.strictObject({
-  windowId: integer.min(1).max(0xffffffff), pid: integer.min(1).max(0x7fffffff),
-  bundleId: z.literal('com.factory.applets.RelayMac'),
-});
+const controlWindowSchema = windowTargetSchema.extend({ bundleId: macBundleIdSchema });
+export const controlTargetSchema = z.union([controlWindowSchema, desktopTargetSchema]);
 const proof = z.strictObject({ token: z.string().regex(/^[a-f0-9]{64}$/), generation: integer });
 export const controlRequestSchema = z.discriminatedUnion('operation', [
   z.strictObject({ operation: z.literal('diagnose'), lease: proof }),
-  z.strictObject({ operation: z.literal('observe'), lease: proof, target: controlTargetSchema }),
-  z.strictObject({ operation: z.literal('press'), lease: proof, target: controlTargetSchema,
+  z.strictObject({ operation: z.literal('observe'), lease: proof, target: controlTargetSchema,
+    mode: z.enum(['pixels', 'count']).optional() }),
+  z.strictObject({ operation: z.literal('press'), lease: proof,
+    target: controlWindowSchema.extend({ bundleId: z.literal(sampleBundle) }),
     observationId: z.string().regex(/^[a-f0-9]{32}$/), elementId: z.literal('relay-increment') }),
+  z.strictObject({ operation: z.literal('mouse'), lease: proof, target: controlTargetSchema,
+    observationId: z.string().regex(/^[a-f0-9]{32}$/), mouse: mouseSchema }),
 ]);
 const element = (id, role) => z.strictObject({
   id: z.literal(id), role: z.literal(role), value: z.string().max(512), enabled: z.boolean(),
 });
-const snapshot = z.strictObject({
-  target: controlTargetSchema,
-  windowRectPoints: z.tuple([z.number().finite(), z.number().finite(), z.number().positive().finite(), z.number().positive().finite()]),
+const snapshot = z.union([z.strictObject({
+  target: controlWindowSchema,
+  windowRectPoints: z.tuple([z.number().finite(), z.number().finite(),
+    z.number().positive().max(16384).finite(), z.number().positive().max(16384).finite()]),
   processStartedAt: z.number().finite(),
-  elements: z.tuple([element('relay-count', 'AXStaticText'), element('relay-increment', 'AXButton')]),
-});
+  elements: z.union([z.tuple([]), z.tuple([element('relay-count', 'AXStaticText'), element('relay-increment', 'AXButton')])]),
+}).refine(s => s.elements.length === 0 || s.target.bundleId === sampleBundle),
+z.strictObject({ target: desktopTargetSchema, displayConfiguration: displayConfigurationSchema, elements: z.tuple([]) })]);
 const results = {
   diagnose: z.strictObject({
     type: z.literal('diagnostic'), bundleId: z.literal('com.factory.applets.host'),
@@ -37,6 +43,7 @@ const results = {
   observe: z.strictObject({ type: z.literal('observation'), snapshot,
     observationId: z.string().regex(/^[a-f0-9]{32}$/), expiresAt: z.number().finite() }),
   press: z.strictObject({ type: z.literal('pressed'), elementId: z.literal('relay-increment') }),
+  mouse: z.strictObject({ type: z.literal('mouse-acknowledged') }),
 };
 const errors = new Set(['busy', 'stale_lease', 'lease_expired', 'unsafe_state', 'unsafe_peer',
   'unsupported_host', 'ipc_path_limit', 'invalid_request', 'invalid_stream', 'stream_timeout',

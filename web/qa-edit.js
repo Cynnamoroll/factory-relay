@@ -1,3 +1,5 @@
+import { sameTarget as targetEquals, isDesktop, sameSnapshotIdentity } from './target-identity.js';
+
 export const QA_EDIT_VERSION = 3;
 export const QA_EDIT_POLICY = Object.freeze({ maxEvents: 12001, maxClips: 256, maxSegments: 12001,
   maxDurationMs: 690000, maxEditedDurationMs: 690000 });
@@ -5,13 +7,12 @@ const kinds = new Set(['run-start', 'run-end', 'frame', 'gap', 'ownership', 'ste
   'action-attempt', 'action', 'observation', 'assertion', 'recording-limit']);
 const id = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 const text = (value, limit) => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, limit);
-const targetEquals = (a, b) => a && b && ['windowId', 'pid', 'bundleId'].every(k => a[k] !== undefined && a[k] === b[k]);
 
 function precedingInput(events, checkStart, assertion, starts, frames) {
   const index = events.indexOf(checkStart), previous = events.slice(0, index).findLast(e => e.kind !== 'frame');
   if (previous?.kind !== 'step-end' || previous.status !== 'pass') return null;
   const start = starts.get(previous.stepId);
-  if (!start || start.operation !== 'press' || !id(start.actionId) || !['agent', 'human'].includes(start.actor) ||
+  if (!start || !['press', 'mouse'].includes(start.operation) || !id(start.actionId) || !['agent', 'human'].includes(start.actor) ||
       [previous, checkStart, assertion].some(e => e.actor !== start.actor)) return null;
   const rows = events.slice(events.indexOf(start), index).filter(e => e.kind !== 'frame');
   if (events.some(e => e.actionId === start.actionId && e.stepId !== start.stepId)) return null;
@@ -30,8 +31,8 @@ function precedingInput(events, checkStart, assertion, starts, frames) {
       !targetEquals(beforeObservation.snapshot?.target, observed.snapshot?.target) ||
       !targetEquals(events[0].target, observed.snapshot?.target) ||
       !targetEquals(observed.snapshot?.target, checkObservation.snapshot?.target) ||
-      beforeObservation.snapshot?.processStartedAt !== observed.snapshot?.processStartedAt ||
-      observed.snapshot?.processStartedAt !== checkObservation.snapshot?.processStartedAt ||
+      !sameSnapshotIdentity(beforeObservation.snapshot, observed.snapshot) ||
+      !sameSnapshotIdentity(observed.snapshot, checkObservation.snapshot) ||
       evidence?.status !== 'available' || evidence.beforeFrameId !== start.beforeFrameId ||
       ack.beforeFrameId !== start.beforeFrameId || observed.beforeFrameId !== start.beforeFrameId ||
       observed.afterFrameId !== evidence.afterFrameId) return null;
@@ -69,21 +70,52 @@ export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
     }
     if (e.kind !== 'assertion') continue;
     const start = starts.get(e.stepId);
-    if (!start || start.operation !== 'assert-count' || outcomes.has(e.stepId) ||
+    if (!start || !['assert-count', 'assert-visual'].includes(start.operation) || outcomes.has(e.stepId) ||
         !['pass', 'fail', 'blocked', 'uncertain'].includes(e.status))
       return unavailable('Unmatched or ambiguous assertion; QA video unavailable.');
     outcomes.add(e.stepId);
     if (!['pass', 'fail'].includes(e.status)) continue;
-    if ([e.expected, e.actual].some(value => value !== undefined && value !== null && (!Number.isSafeInteger(value) || value < 0)))
+    const visual = start.operation === 'assert-visual';
+    if (visual ? e.checkKind !== 'visual' || e.assessment?.source !== 'caller' || e.assessment?.serverVerified !== false ||
+        e.assessment.actor !== e.actor || !['human', 'agent'].includes(e.actor) ||
+        [e.expected, e.actual].some(value => typeof value !== 'string' || !value.trim() || value.length > 600) ||
+        !frames.has(e.afterFrameId)
+      : [e.expected, e.actual].some(value => value !== undefined && value !== null && (!Number.isSafeInteger(value) || value < 0)))
       return unavailable('Invalid assertion values; QA video unavailable.');
     if (e.elapsedMs <= start.elapsedMs || (clips.length && start.elapsedMs < clips.at(-1).sourceEndMs) ||
         clips.length >= policy.maxClips) return unavailable('Overlapping, empty or excessive QA intervals.');
     if (events.some(row => row.elapsedMs >= start.elapsedMs && row.elapsedMs < e.elapsedMs &&
         (row.kind === 'ownership' || ['step-start', 'action-attempt', 'action', 'observation'].includes(row.kind) && row.stepId !== e.stepId)))
       return unavailable('Unrelated operations overlap a QA interval; QA video unavailable.');
-    const input = precedingInput(events, start, e, starts, frames);
+    let input = precedingInput(events, start, e, starts, frames);
+    let assessed;
+    if (visual) {
+      const checkObservation = events.find(row => row.kind === 'observation' && row.seq === e.observationSeq && row.stepId === e.stepId);
+      const original = events.filter(row => row.kind === 'observation' && row.observationId === e.observationId && row.stepId !== e.stepId);
+      const frame = frames.get(e.afterFrameId);
+      if (original.length !== 1 || !checkObservation || checkObservation.afterFrameId !== e.afterFrameId ||
+          original[0].afterFrameId !== e.afterFrameId || original[0].actor !== e.actor ||
+          !targetEquals(original[0].snapshot?.target, checkObservation.snapshot?.target) ||
+          !targetEquals(events[0].target, checkObservation.snapshot?.target) ||
+          !sameSnapshotIdentity(original[0].snapshot, checkObservation.snapshot) ||
+          !isDesktop(checkObservation.snapshot?.target) && !Number.isFinite(checkObservation.snapshot?.processStartedAt) ||
+          original[0].elapsedMs >= start.elapsedMs || original[0].elapsedMs <= frame.elapsedMs ||
+          e.elapsedMs - original[0].elapsedMs > 30000 ||
+          events.some(row => row.elapsedMs > original[0].elapsedMs && row.elapsedMs < start.elapsedMs &&
+            (['gap', 'ownership', 'action-attempt', 'action', 'assertion', 'step-start'].includes(row.kind))))
+        return unavailable('Visual assessment lacks fresh, unconsumed selected-target evidence.');
+      assessed = { role: 'assessed-frame', operationStepId: original[0].stepId,
+        sourceStartMs: frame.elapsedMs, sourceEndMs: original[0].elapsedMs, beforeFrameId: frame.frameId };
+      if (input) {
+        input.sourceEndMs = Math.min(input.sourceEndMs, assessed.sourceStartMs);
+        if (input.sourceEndMs <= input.sourceStartMs) input = null;
+      }
+      if (clips.length && assessed.sourceStartMs < clips.at(-1).sourceEndMs)
+        return unavailable('Visual evidence cannot reuse prior check context.');
+    }
     const clip = { stepId: e.stepId, status: e.status, title: text(e.title ?? start.title ?? 'Count check', 160),
       context: text(e.context ?? start.context, 600), expected: e.expected ?? null, actual: e.actual ?? null,
+      ...(visual ? { kind: 'visual', assessment: e.assessment, frameId: e.afterFrameId } : {}),
       sourceStartMs: start.elapsedMs, sourceEndMs: e.elapsedMs, startMs: durationMs,
       evidenceNote: input ? 'Preceding recorded input; context, not proof of causation.' : 'Assertion observation only; no associated input.' };
     const add = (kind, ms, fields) => {
@@ -91,6 +123,7 @@ export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
       durationMs += ms;
     };
     for (const interval of [...(input ? [{ ...input, role: 'preceding-input' }] : []),
+      ...(assessed ? [assessed] : []),
       { role: 'assertion', operationStepId: e.stepId, sourceStartMs: start.elapsedMs, sourceEndMs: e.elapsedMs,
         beforeFrameId: start.beforeFrameId ?? null }]) {
       const ms = interval.sourceEndMs - interval.sourceStartMs;

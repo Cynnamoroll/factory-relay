@@ -11,6 +11,23 @@ STREAM_ERRORS = {"busy", "stale_lease", "lease_expired", "unsafe_state", "unsafe
                  "unsupported_host", "ipc_path_limit", "invalid_request", "invalid_stream",
                  "stream_timeout", "stream_closed", "stream_interrupted", "host_unavailable"}
 
+def valid_bundle(value):
+    return isinstance(value, str) and len(value) <= 255 and re.fullmatch(r"[A-Za-z0-9._-]*", value) is not None
+
+
+def valid_target(target):
+    if type(target) is not dict:
+        return False
+    if target.get("kind") == "desktop":
+        return (set(target) == {"kind", "displayId", "displayUUID"}
+                and type(target["displayId"]) is int and 0 < target["displayId"] < 2**32
+                and isinstance(target["displayUUID"], str)
+                and re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", target["displayUUID"]) is not None)
+    return (set(target) == {"windowId", "pid", "bundleId"}
+            and type(target["windowId"]) is int and 0 < target["windowId"] < 2**32
+            and type(target["pid"]) is int and 0 < target["pid"] < 2**31
+            and valid_bundle(target["bundleId"]) and target["bundleId"] != "com.factory.applets.host")
+
 
 def peer_uid(connection):
     if sys.platform == "darwin":
@@ -157,12 +174,10 @@ def stream_main():
         argv = [request["mode"]]
         if request["mode"] == "stream":
             target = request["target"]
-            if (set(target) != {"windowId", "pid", "bundleId"}
-                    or type(target["windowId"]) is not int or not 0 < target["windowId"] < 2**32
-                    or type(target["pid"]) is not int or not 0 < target["pid"] < 2**31
-                    or target["bundleId"] not in ("com.apple.iphonesimulator", "com.apple.dt.Devices", "com.factory.applets.RelayMac")):
+            if not valid_target(target):
                 raise Failure("invalid_request")
-            argv += [str(target["windowId"]), str(target["pid"]), target["bundleId"]]
+            argv += (["desktop", str(target["displayId"]), target["displayUUID"]] if target.get("kind") == "desktop"
+                     else [str(target["windowId"]), str(target["pid"]), target["bundleId"]])
         elif request["target"] is not None:
             raise Failure("invalid_request")
         end = time.monotonic() + request["timeout"]

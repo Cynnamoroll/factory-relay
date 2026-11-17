@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import path from 'node:path';
+import { applicationsSchema } from './qa-applications.js';
 
 const text = z.string().min(1).max(256).regex(/^[^\x00-\x1f\x7f]+$/);
 const absolute = text.refine(s => s.startsWith('/') && path.posix.normalize(s) === s && s !== '/', 'Use a normalized absolute path');
@@ -40,6 +41,7 @@ const commonConfig = {
   owner: z.string().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9_.:@/-]*$/),
   timeoutSeconds: z.number().int().min(1).max(1800).default(300),
   localWorkspace: absolute.optional(),
+  applications: applicationsSchema.optional(),
 };
 export const configSchema = z.preprocess(value => value && typeof value === 'object'
   ? { transport: 'factory', ...value } : value, z.discriminatedUnion('transport', [

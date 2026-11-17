@@ -10,14 +10,18 @@ const equal = (a, b) => typeof a === 'string' && typeof b === 'string' &&
   a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const web = fileURLToPath(new URL('../web/', import.meta.url));
 const safeError = e => /^[a-z_]{1,64}$/.test(e.message) ? e.message : 'request_failed';
+const errorStatus = e => ['run_not_found', 'frame_not_found', 'export_not_ready'].includes(e.message) ? 404
+  : ['run_active', 'export_busy', 'deletion_pending'].includes(e.message) ? 409 : 400;
 
 export function createQAServer(broker, { agentToken = secret(), pairingCode = secret() } = {}) {
   let origin, host, paired = false, session = null, attempts = 0, reset = Date.now(), inflight = 0;
+  const confirmations = new Map();
   const assets = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']],
     ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
     ['/replay-entry.js', ['replay-entry.js', 'text/javascript; charset=utf-8']],
     ['/qa-edit.js', ['qa-edit.js', 'text/javascript; charset=utf-8']],
+    ['/target-identity.js', ['target-identity.js', 'text/javascript; charset=utf-8']],
     ['/style.css', ['style.css', 'text/css; charset=utf-8']],
   ]);
   const server = http.createServer(async (req, res) => {
@@ -106,6 +110,7 @@ export function createQAServer(broker, { agentToken = secret(), pairingCode = se
         }
         if (req.url === '/api/session') return send(200, { actor, ...(actor === 'human' ? { csrf: session.csrf } : {}) });
         if (req.url === '/api/status') return send(200, broker.status());
+        if (req.url === '/api/recordings') return send(200, await broker.recordings());
         if (req.url === '/api/runs') return send(200, broker.store.history());
         if (req.url === '/api/live') {
           if (!broker.latest) return send(409, { error: 'no_live_frame' });
@@ -118,15 +123,41 @@ export function createQAServer(broker, { agentToken = secret(), pairingCode = se
           ? send(200, broker.store.image(match[1], match[2]), 'image/jpeg')
           : send(200, broker.store.get(match[1]).events);
       }
+      const deletion = req.url.match(/^\/api\/recordings\/([a-f0-9]{32})\/(confirm-delete|delete)$/);
+      if (req.method === 'POST' && deletion) {
+        if (actor !== 'human') return send(403, { error: 'human_confirmation_required' });
+        const input = await body(), id = deletion[1];
+        if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('invalid_arguments');
+        if (deletion[2] === 'confirm-delete') {
+          if (Object.keys(input).length) throw new Error('invalid_arguments');
+          const info = await broker.enqueue(() => broker.deletionInfo(id));
+          if (info.reason) throw new Error(info.reason);
+          for (const [token, value] of confirmations) if (value.expires < Date.now()) confirmations.delete(token);
+          if (confirmations.size >= 128) throw new Error('confirmation_limit');
+          const confirmation = secret();
+          confirmations.set(confirmation, { id, expires: Date.now() + 600000, deleted: false });
+          return send(200, { runId: id, title: info.title, confirmation });
+        }
+        if (Object.keys(input).length !== 1 || typeof input.confirmation !== 'string') throw new Error('invalid_arguments');
+        const confirmed = confirmations.get(input.confirmation);
+        if (!confirmed || confirmed.id !== id || confirmed.expires < Date.now())
+          return send(403, { error: 'human_confirmation_required' });
+        if (!confirmed.deleted) {
+          confirmed.work ??= broker.deleteRecording(actor, id).then(() => { confirmed.deleted = true; })
+            .finally(() => { delete confirmed.work; });
+          await confirmed.work;
+        }
+        return send(200, { runId: id, deleted: true });
+      }
       if (req.method === 'POST' && req.url === '/api/command')
         return send(200, await broker.command(actor, await body()));
       const task = req.url.match(/^\/api\/tasks\/(qa_[a-z]+)$/);
       if (req.method === 'POST' && task) {
         try { return send(200, await broker.task(actor, task[1], await body())); }
-        catch (e) { return send(400, { error: safeError(e), failure: failure(e, task[1], actor) }); }
+        catch (e) { return send(errorStatus(e), { error: safeError(e), failure: failure(e, task[1], actor) }); }
       }
       return send(404, { error: 'not_found' });
-    } catch (e) { if (!res.headersSent) send(400, { error: safeError(e) }); else res.destroy(); }
+    } catch (e) { if (!res.headersSent) send(errorStatus(e), { error: safeError(e) }); else res.destroy(); }
   });
   server.maxConnections = 32;
   server.requestTimeout = 10000;

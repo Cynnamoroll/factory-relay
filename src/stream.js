@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { configSchema } from './schema.js';
 import { quote } from './transport.js';
+import { windowTargetSchema, desktopTargetSchema, targetSchema, displayConfigurationSchema, sameTarget } from './window-target.js';
 
 export const HEADER_LIMIT = 8192;
 export const IMAGE_LIMIT = 4 * 1024 * 1024;
@@ -11,19 +12,21 @@ const STREAM_ERRORS = new Set(['busy', 'stale_lease', 'lease_expired', 'unsafe_s
   'stream_timeout', 'stream_closed', 'stream_interrupted', 'host_unavailable']);
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const rect = z.tuple([z.number().finite(), z.number().finite(), z.number().nonnegative().finite(), z.number().nonnegative().finite()]);
-export const streamTargetSchema = z.strictObject({
-  windowId: integer.min(1).max(0xffffffff), pid: integer.min(1).max(0x7fffffff),
-  bundleId: z.enum(['com.apple.iphonesimulator', 'com.apple.dt.Devices', 'com.factory.applets.RelayMac']),
-});
-const frameSchema = z.strictObject({
+export const streamTargetSchema = targetSchema;
+const frameFields = {
   protocol: z.literal(1), type: z.literal('frame'), sequence: integer.min(1),
-  ...streamTargetSchema.shape, mediaType: z.literal('image/jpeg'),
+  mediaType: z.literal('image/jpeg'),
   width: integer.min(1).max(2048), height: integer.min(1).max(2048),
   captureTimeSeconds: z.number().nonnegative().finite(), sentUptimeSeconds: z.number().nonnegative().finite(),
-  contentRectPixels: rect, initialWindowRectPoints: rect,
+  contentRectPixels: rect,
   contentScale: z.number().positive().finite(), scaleFactor: z.number().positive().finite(),
   replacedFrames: integer, bytes: integer.min(1).max(IMAGE_LIMIT),
-});
+};
+const frameSchema = z.union([
+  z.strictObject({ ...frameFields, ...windowTargetSchema.shape, initialWindowRectPoints: rect,
+    processStartedAt: z.number().finite().optional() }),
+  z.strictObject({ ...frameFields, ...desktopTargetSchema.shape, displayConfiguration: displayConfigurationSchema }),
+]);
 const diagnosticSchema = z.strictObject({
   protocol: z.literal(1), type: z.literal('diagnostic'), bytes: z.literal(0),
   code: z.enum(['permission_preflight', 'screen_recording_required', 'capture_unavailable']),
@@ -41,13 +44,15 @@ const diagnosticSchema = z.strictObject({
 });
 const windowsSchema = z.strictObject({
   protocol: z.literal(1), type: z.literal('windows'), bytes: z.literal(0),
-  windows: z.array(streamTargetSchema.extend({ title: z.string().max(1024), windowRectPoints: rect })).max(100),
+  displays: z.array(desktopTargetSchema.extend({ main: z.boolean(), displayConfiguration: displayConfigurationSchema })).max(32).default([]),
+  windows: z.array(windowTargetSchema.extend({ title: z.string().max(1024), windowRectPoints: rect,
+    displayName: z.string().max(120).optional(), processStartedAt: z.number().finite().optional() })).max(100),
 });
 const heartbeatSchema = z.strictObject({
   protocol: z.literal(1), type: z.literal('heartbeat'), bytes: z.literal(0),
   sentUptimeSeconds: z.number().nonnegative().finite(),
 });
-const headerSchema = z.discriminatedUnion('type', [frameSchema, diagnosticSchema, windowsSchema, heartbeatSchema]);
+const headerSchema = z.union([frameSchema, diagnosticSchema, windowsSchema, heartbeatSchema]);
 
 /** Bounded packet buffering; consumer completion gates transport acknowledgments. */
 export async function* decodeStream(readable) {
@@ -130,8 +135,7 @@ export async function consumeHost(config, { lease, mode = 'stream', target = nul
       packets++;
       terminal = ['diagnostic', 'windows'].includes(kind);
       if (packet.header.type === 'frame') {
-        if (packet.header.windowId !== target.windowId || packet.header.pid !== target.pid ||
-            packet.header.bundleId !== target.bundleId) throw new Error('stream_target_mismatch');
+        if (!sameTarget(packet.header, target)) throw new Error('stream_target_mismatch');
         frames++;
       }
       const streaming = ['frame', 'heartbeat'].includes(packet.header.type);

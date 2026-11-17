@@ -3,7 +3,6 @@ import ScreenCaptureKit
 import CoreImage
 import Darwin
 
-let allowedBundles = ["com.apple.iphonesimulator", "com.apple.dt.Devices", "com.factory.applets.RelayMac"]
 let maxImageBytes = 4 * 1024 * 1024
 
 enum HostError: Error { case invalidTarget, disconnected, timeout, oversized }
@@ -219,35 +218,77 @@ enum HostSession {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
             stage = .windowsReady
             let windows = content.windows.filter {
-                allowedBundles.contains($0.owningApplication?.bundleIdentifier ?? "") && $0.windowLayer == 0
+                guard let owner = $0.owningApplication,
+                      let app = NSRunningApplication(processIdentifier: owner.processID) else { return false }
+                let bundle = app.bundleIdentifier ?? ""
+                return bundle != "com.factory.applets.host" && !app.isTerminated && processStartTime(owner.processID) != nil &&
+                    bundle.utf8.count <= 255 && bundle.range(of: "^[A-Za-z0-9._-]*$", options: .regularExpression) != nil &&
+                    $0.windowLayer == 0 && $0.isOnScreen && $0.frame.width > 0 && $0.frame.height > 0 &&
+                    $0.frame.width <= 16384 && $0.frame.height <= 16384
+            }
+            var displays: [[String: Any]] = []
+            for display in content.displays.prefix(32) {
+                let target = ControlTarget(displayId: display.displayID, displayUUID: try DisplayConfiguration.identity(display.displayID))
+                let configuration = try DisplayConfiguration.current(target)
+                var row = try JSONSerialization.jsonObject(with: JSONEncoder().encode(target)) as! [String: Any]
+                row["main"] = display.displayID == CGMainDisplayID()
+                row["displayConfiguration"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(configuration))
+                displays.append(row)
             }
             if args == ["windows"] {
-                let rows: [[String: Any]] = windows.map {
-                    ["windowId": $0.windowID, "pid": $0.owningApplication!.processID,
-                     "bundleId": $0.owningApplication!.bundleIdentifier,
-                     "title": $0.title ?? "",
-                     "windowRectPoints": [$0.frame.minX, $0.frame.minY, $0.frame.width, $0.frame.height]]
+                var rows: [[String: Any]] = []
+                for window in windows.prefix(100) {
+                    guard let owner = window.owningApplication,
+                          let app = NSRunningApplication(processIdentifier: owner.processID),
+                          let started = processStartTime(owner.processID) else { continue }
+                    let displayName = String(decoding: (app.localizedName ?? "Application").utf16.prefix(80), as: UTF16.self)
+                    let row: [String: Any] = ["windowId": window.windowID, "pid": owner.processID,
+                        "bundleId": app.bundleIdentifier ?? "", "title": displayName,
+                        "displayName": displayName,
+                        "processStartedAt": started,
+                        "windowRectPoints": [window.frame.minX, window.frame.minY, window.frame.width, window.frame.height]]
+                    guard try json(["protocol": 1, "type": "windows", "displays": displays, "windows": rows + [row]]).count < 7000 else { break }
+                    rows.append(row)
                 }
-                FileHandle.standardOutput.write(try json(["protocol": 1, "type": "windows", "windows": rows]) + Data([10]))
+                FileHandle.standardOutput.write(try json(["protocol": 1, "type": "windows", "displays": displays, "windows": rows]) + Data([10]))
                 return
             }
-            guard let id = UInt32(args[1]), let pid = Int32(args[2]),
-                  let window = windows.first(where: {
-                      $0.windowID == id && $0.owningApplication?.processID == pid &&
-                      $0.owningApplication?.bundleIdentifier == args[3]
-                  }), window.frame.width > 0, window.frame.height > 0 else { throw HostError.invalidTarget }
+            let target: ControlTarget
+            let filter: SCContentFilter
+            let initial: ControlSnapshot
             stage = .creatingFilter
-            let filter = SCContentFilter(desktopIndependentWindow: window)
+            if args[1] == "desktop" {
+                guard let id = UInt32(args[2]), validDisplayUUID(args[3]),
+                      let display = content.displays.first(where: { $0.displayID == id }) else { throw HostError.invalidTarget }
+                target = ControlTarget(displayId: id, displayUUID: args[3])
+                initial = try Control.identitySnapshot(target)
+                filter = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
+            } else {
+                guard let id = UInt32(args[1]), let pid = Int32(args[2]),
+                      let window = windows.first(where: {
+                          $0.windowID == id && $0.owningApplication?.processID == pid &&
+                          NSRunningApplication(processIdentifier: pid).map { ($0.bundleIdentifier ?? "") == args[3] } == true
+                      }) else { throw HostError.invalidTarget }
+                target = ControlTarget(windowId: id, pid: pid, bundleId: args[3])
+                initial = try Control.identitySnapshot(target)
+                guard initial.rectPoints == [window.frame.minX, window.frame.minY, window.frame.width, window.frame.height] else { throw HostError.invalidTarget }
+                filter = SCContentFilter(desktopIndependentWindow: window)
+            }
             stage = .filterReady
             let config = SCStreamConfiguration()
-            let ratio = min(1, 2048 / max(window.frame.width * 2, window.frame.height * 2))
-            config.width = max(1, Int(window.frame.width * 2 * ratio))
-            config.height = max(1, Int(window.frame.height * 2 * ratio))
+            let r = initial.rectPoints
+            let captureScale = target.isDesktop ? Double(filter.pointPixelScale) : 2
+            let pixelWidth = r[2] * captureScale
+            let pixelHeight = r[3] * captureScale
+            let ratio = min(1, 2048 / max(pixelWidth, pixelHeight))
+            config.width = max(1, Int(pixelWidth * ratio))
+            config.height = max(1, Int(pixelHeight * ratio))
             config.minimumFrameInterval = CMTime(value: 1, timescale: 15)
             config.queueDepth = 3
             config.pixelFormat = kCVPixelFormatType_32BGRA
             config.capturesAudio = false
-            config.showsCursor = false
+            config.showsCursor = true
+            if #available(macOS 14.0, *) { config.ignoreShadowsSingleWindow = true }
             let capture = Capture()
             let stream = SCStream(filter: filter, configuration: config, delegate: capture)
             try stream.addStreamOutput(capture, type: .screen,
@@ -263,6 +304,7 @@ enum HostSession {
                     var sequence: UInt64 = 0
                     let end = ProcessInfo.processInfo.systemUptime + 1800
                     while ProcessInfo.processInfo.systemUptime < end {
+                        guard try await Control.identitySnapshot(target) == initial else { throw HostError.invalidTarget }
                         guard let (sample, dropped) = try capture.take() else {
                             try send(json(["protocol": 1, "type": "heartbeat", "bytes": 0,
                                            "sentUptimeSeconds": ProcessInfo.processInfo.systemUptime]))
@@ -273,24 +315,31 @@ enum HostSession {
                                 as? [[SCStreamFrameInfo: Any]], let info = attachments.first,
                               let rectDict = info[.contentRect] as? NSDictionary,
                               let rect = CGRect(dictionaryRepresentation: rectDict as CFDictionary) else { continue }
+                        guard try await Control.identitySnapshot(target) == initial else { throw HostError.invalidTarget }
                         let image = CIImage(cvPixelBuffer: pixels)
                         guard let jpeg = context.jpegRepresentation(of: image, colorSpace: colorSpace,
                             options: [kCGImageDestinationLossyCompressionQuality as CIImageRepresentationOption: 0.7]),
                               jpeg.count <= maxImageBytes else { throw HostError.oversized }
                         sequence += 1
-                        let header = try json([
+                        var headerFields = try JSONSerialization.jsonObject(with: JSONEncoder().encode(target)) as! [String: Any]
+                        if let configuration = initial.displayConfiguration {
+                            headerFields["displayConfiguration"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(configuration))
+                        } else {
+                            headerFields["processStartedAt"] = initial.processStartedAt
+                            headerFields["initialWindowRectPoints"] = initial.windowRectPoints
+                        }
+                        headerFields.merge([
                             "protocol": 1, "type": "frame", "sequence": sequence,
-                            "windowId": id, "pid": pid, "bundleId": args[3], "mediaType": "image/jpeg",
+                            "mediaType": "image/jpeg",
                             "width": CVPixelBufferGetWidth(pixels), "height": CVPixelBufferGetHeight(pixels),
                             "captureTimeSeconds": CMTimeGetSeconds(sample.presentationTimeStamp),
                             "sentUptimeSeconds": ProcessInfo.processInfo.systemUptime,
                             "contentRectPixels": [rect.minX, rect.minY, rect.width, rect.height],
-                            "initialWindowRectPoints": [window.frame.minX, window.frame.minY, window.frame.width, window.frame.height],
                             "contentScale": info[.contentScale] as? CGFloat ?? 1,
                             "scaleFactor": info[.scaleFactor] as? CGFloat ?? 1,
                             "replacedFrames": dropped, "bytes": jpeg.count
-                        ])
-                        try send(header, image: jpeg)
+                        ], uniquingKeysWith: { _, new in new })
+                        try send(json(headerFields), image: jpeg)
                     }
                 }.value
             } catch {

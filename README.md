@@ -1,8 +1,12 @@
 # factory-relay
 
-Shared Mac sample QA in Factory's embedded browser, with named checks and recordings.
-**Current end-to-end input supports only the RelayMac sample's Increment button,
-not arbitrary Mac or iOS apps.**
+Shared Mac desktop QA in Factory's embedded browser, with named checks and recordings.
+One selected display captures all visible apps, menus, sheets, Dock and menu bar.
+Generic mouse move, left/right click, double-click, drag and scroll use the same
+approved Factory Relay host. Restricted window mode and the RelayMac count API
+remain available. All selected-display content is private local evidence; review
+it before sharing.
+**iOS input and keyboard/type input are not supported by this slice.**
 
 ## Requirements
 
@@ -109,16 +113,140 @@ npm run qa:open
 ```
 
 This pairs Factory's existing embedded browser pane, not an external browser.
-Optionally run `droid mcp list` to check `factory-relay` and its nine QA tools.
+Optionally run `droid mcp list` to check `factory-relay` and its ten QA tools.
 If missing, reload project MCP servers or reopen the project after setup.
 
 Keep RelayMac visible on the unlocked Mac. Ask Droid:
-“Use factory-relay to check that Increment adds one to the current count,
+“Use factory-relay with `qa_start({applicationId:"relaymac"})` to check that Increment adds one to the current count,
 finish the run, and give me the recording.” Do not assume the count starts at zero.
 
 Configuration, credentials, recordings (`.qa-workspace/`), and artifacts are
 private and Git-ignored. Review recordings before sharing. Keep the broker local;
 do not expose it through a tunnel or public listener.
+
+## Optional application profiles
+
+Keep `config.local.json` private. Add an optional `applications` array to register
+up to 32 apps, then restart the local broker when no run is active. For example:
+
+```json
+{
+  "applications": [
+    {"id":"relaymac","name":"RelayMac","platform":"macos","bundleId":"com.factory.applets.RelayMac"},
+    {"id":"editor","name":"My Editor","platform":"macos","bundleId":"com.example.Editor"},
+    {"id":"demo-ios","name":"Demo iOS","platform":"ios-simulator","bundleId":"com.example.Demo","simulatorUdid":"abcdef12-1234-4234-8234-123456789012"}
+  ]
+}
+```
+
+Merge this field into your existing config, preserving its transport settings.
+Profiles identify an app/device; they contain no app-specific automation.
+Omitting it allows desktop-wide control on one selected display. `qa_start({})`
+selects the actual main display, never the first discovered entry. Other displays
+and restricted windows can be selected explicitly. No per-app profile is needed for generic QA, including
+bare executables whose bundle ID is empty. An explicit array is an allowlist;
+`[]` authorizes no targets. Any explicit array disables desktop authority. IDs must be unique safe identifiers; profile bundle IDs
+cannot contain wildcards. iOS profiles require an exact simulator UUID.
+
+Read `qa_status.applications` for profile shortcuts, or call `qa_targets` for
+displays (including `main`, point bounds and stable UUID) and visible authorized
+Mac windows. Pass an exact `target` to `qa_start` within 30 seconds of discovery.
+Capabilities describe implemented support, not permissions, running apps or device
+discovery. Mac profiles use the same generic window driver. RelayMac additionally
+supports count observation, increment and integer checks. iOS profiles remain
+unsupported and cannot authorize Mac input through a matching bundle identity.
+
+## Generic mouse QA
+
+Use only the existing broker and approved Factory Relay host. The default desktop
+target is `{kind:"desktop",displayId,displayUUID}` with a canonical lowercase UUID.
+A desktop run permits ordinary cross-app interaction on that display only.
+Display disconnect, identity, origin, resolution, scale or rotation changes fail
+closed. No keyboard, permission bypass or protected-surface control is provided.
+
+Optional restricted targets remain `{windowId,pid,bundleId}`. Their exact window
+must be foreground and unobscured at every input point, including public AX hit
+testing. Process identity uses kernel start time, including for bare binaries with
+empty bundle IDs. Window mode intentionally rejects other windows and popovers.
+
+Calls below use IDs returned by preceding calls, not guessed IDs:
+
+```text
+qa_targets({})
+qa_start({title: "Main desktop interaction checks"})
+// Or choose a discovered display: target: {kind:"desktop",displayId:DISPLAY_ID,displayUUID:DISPLAY_UUID}
+qa_observe({runId: RUN_ID, mode: "pixels", includeImage: true})
+qa_act({runId: RUN_ID, action: "mouse", observationId: OBSERVATION_ID,
+  mouse: {kind: "click", x: 0.25, y: 0.5, button: "left", count: 1}})
+qa_check({runId: RUN_ID, kind: "visual", observationId: RETURNED_OBSERVATION_ID,
+  title: "Expected view is visible", expected: "Describe the intended view",
+  actual: "Describe the screenshot you inspected", outcome: "pass"})
+qa_observe({runId: RUN_ID, mode: "pixels", includeImage: true})
+qa_act({runId: RUN_ID, action: "mouse", observationId: OBSERVATION_ID,
+  mouse: {kind: "drag", x: 0.2, y: 0.6, toX: 0.7, toY: 0.6, durationMs: 500}})
+qa_check({runId: RUN_ID, kind: "visual", observationId: RETURNED_OBSERVATION_ID,
+  title: "Drag result", expected: "Describe the intended final position",
+  actual: "Describe the post-drag screenshot", outcome: "pass"})
+qa_finish({runId: RUN_ID})
+qa_report({runId: RUN_ID, waitMs: 30000})
+```
+
+Use `button:"right"` for a right click and `count:2` for a double click.
+Other mouse commands are `{kind:"move",x,y}` and
+`{kind:"scroll",x,y,deltaX,deltaY}`. Scroll deltas are signed integer pixels,
+bounded to ±600 on each axis. Drag duration is 100–1000 ms with bounded steps.
+Always inspect the returned post-action image and record a check after input.
+Choose the outcome from the inspected screenshot. The example text and coordinates
+are illustrative, not app-specific assertions or control locations.
+
+Coordinates are normalized **[0,1)**, with the selected target's top-left at
+`(0,0)`. Desktop `displayConfiguration.boundsPoints` includes negative origins,
+with exact pixel dimensions, scale and rotation. Restricted windows retain
+`windowRectPoints` and `processStartedAt`. For a raw JPEG
+pixel `(px,py)`, use
+`x=(px-contentRectPixels[0])/contentRectPixels[2]` and
+`y=(py-contentRectPixels[1])/contentRectPixels[3]`.
+Use `imageGeometry` from the same observation. Do not divide by a browser's
+letterboxed rectangle or the exported 1280×720 video dimensions.
+
+`qa_observe` binds fresh pixels to display identity/configuration or window geometry
+and process start. Slow native observation and idle capture trigger a fresh capture
+within the bounded startup budget, without relaxing the two-second frame-age limit.
+Generic `actual` is null. Observations expire within 30 seconds and are consumed
+before input. Acknowledgement is separate from an assertion. Never automatically
+retry uncertain mouse input. Native drag cleanup releases a held button on
+validation failure or IPC interruption; uncertain replies retain recovery fencing.
+
+Visual checks require a fresh, unconsumed observation and bounded expected/actual
+text. The recorded outcome is the caller's screenshot assessment, explicitly
+`serverVerified:false`, not a server-computed fact. Checks retain frame links and
+recorded footage in the default QA MP4, with conservative preceding-input context
+and marked gaps. Existing journals and ready exports are not rewritten.
+
+Live keeps the same shared image and ownership controls. Count controls are
+disabled for desktop and generic windows. Human pointer interaction in the Live image is not
+implemented; generic input uses `qa_act`, not a second native bridge.
+
+### Recording storage and deletion
+
+Recording deletion currently requires the local broker to run on Linux.
+
+Recordings shows file-content sizes for source JPEGs/journals and all generated
+exports, plus separate source (2 GiB) and export (512 MiB) limits and the 64-run
+limit. Binary units exclude filesystem metadata/allocation overhead. Completed
+export sizes are cached; Refresh updates the library and in-progress sizes.
+
+Use a row's **Delete** action or **Delete recording…** in replay details. The
+paired browser requires a named, permanent-deletion confirmation; Cancel removes
+nothing. Active recordings and queued/encoding exports cannot be deleted. Wait
+for completion, then refresh. No destructive MCP tool or automatic retention
+purge is provided. Deletion releases the run slot and its source/export capacity.
+
+The Linux broker records a durable, exact-file deletion intent before cleanup.
+Failed deletion stays pending and cannot replay or regenerate exports. Retry
+resumes only that confirmed recording; restart also resumes confirmed cleanup.
+Unknown files, links or changed file identities stop cleanup rather than deleting
+unrecognized data. Source and export directories are checked independently.
 
 ## License
 

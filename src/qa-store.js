@@ -13,9 +13,71 @@ export const POLICY = Object.freeze({
 function privateEntry(file, directory = false) {
   const s = fs.lstatSync(file);
   if (s.isSymbolicLink() || s.uid !== process.getuid() || (s.mode & 0o077) ||
-      (directory ? !s.isDirectory() : !s.isFile())) throw new Error('unsafe_qa_storage');
+      (directory ? !s.isDirectory() : !s.isFile() || s.nlink !== 1)) throw new Error('unsafe_qa_storage');
   return s;
 }
+
+const sourceName = name => name === 'events.jsonl' || /^[a-f0-9]{32}\.jpg$/.test(name);
+const identity = s => ({ dev: s.dev, ino: s.ino });
+export const sameFile = (a, b) => !!a && !!b && a.dev === b.dev && a.ino === b.ino;
+function directory(file) {
+  const prior = privateEntry(file, true);
+  const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+  const opened = fs.fstatSync(fd);
+  if (!sameFile(prior, opened)) { fs.closeSync(fd); throw new Error('unsafe_deletion_storage'); }
+  return { fd, path: `/proc/self/fd/${fd}`, ...identity(opened) };
+}
+function validateSnapshot(snapshot, allow) {
+  if (snapshot === null) return;
+  if (!snapshot || !Number.isSafeInteger(snapshot.dev) || !Number.isSafeInteger(snapshot.ino) ||
+      !Array.isArray(snapshot.files) || snapshot.files.length > POLICY.maxFrames + 256 ||
+      new Set(snapshot.files.map(f => f.name)).size !== snapshot.files.length ||
+      snapshot.files.some(f => !allow(f.name) || !Number.isSafeInteger(f.dev) ||
+        !Number.isSafeInteger(f.ino) || !Number.isSafeInteger(f.bytes) || f.bytes < 0))
+    throw new Error('unsafe_deletion_intent');
+}
+/** Descriptor-relative paths keep cleanup inside the inspected Linux directories, even after a rename. */
+export function ownedFiles(root, id, allow, expected = undefined, remove = false) {
+  if (!isId(id)) throw new Error('run_not_found');
+  if (process.platform !== 'linux') throw new Error('deletion_requires_linux');
+  if (expected !== undefined) validateSnapshot(expected, allow);
+  const parent = directory(root);
+  let child;
+  try {
+    const file = path.join(parent.path, id);
+    try { child = directory(file); }
+    catch (e) { if (e.code === 'ENOENT') return null; throw e; }
+    if (expected !== undefined && (!expected || !sameFile(child, expected))) throw new Error('unsafe_deletion_storage');
+    const expectedFiles = new Map(expected?.files.map(f => [f.name, f]) ?? []);
+    const files = fs.readdirSync(child.path).map(name => {
+      if (!allow(name)) throw new Error('unsafe_deletion_storage');
+      const stat = privateEntry(path.join(child.path, name));
+      const entry = { name, ...identity(stat), bytes: stat.size };
+      if (expected !== undefined) {
+        const prior = expectedFiles.get(name);
+        if (!prior || !sameFile(prior, entry) || prior.bytes !== entry.bytes) throw new Error('unsafe_deletion_storage');
+      }
+      return entry;
+    });
+    if (remove) {
+      for (const entry of files) {
+        const name = path.join(child.path, entry.name);
+        if (!sameFile(privateEntry(file, true), child)) throw new Error('unsafe_deletion_storage');
+        if (!sameFile(privateEntry(name), entry)) throw new Error('unsafe_deletion_storage');
+        fs.unlinkSync(name);
+      }
+      fs.fsyncSync(child.fd);
+      if (!sameFile(privateEntry(file, true), child)) throw new Error('unsafe_deletion_storage');
+      fs.rmdirSync(file);
+      fs.fsyncSync(parent.fd);
+    }
+    return { dev: child.dev, ino: child.ino, files };
+  } finally {
+    if (child) fs.closeSync(child.fd);
+    fs.closeSync(parent.fd);
+  }
+}
+export const snapshotBytes = snapshot => snapshot?.files.reduce((sum, f) => sum + f.bytes, 0) ?? 0;
 
 /** A private append-only journal. Only an incomplete final record is truncated on recovery. */
 export class RunStore {
@@ -23,6 +85,7 @@ export class RunStore {
     this.root = root;
     this.policy = policy;
     this.runs = new Map();
+    this.deletions = new Map();
     this.totalBytes = 0;
     fs.mkdirSync(root, { recursive: true, mode: 0o700 });
     privateEntry(root, true);
@@ -37,12 +100,31 @@ export class RunStore {
     }
     fs.writeFileSync(this.lock, String(process.pid), { flag: 'wx', mode: 0o600 });
     try {
+      for (const name of fs.readdirSync(root)) {
+        const match = name.match(/^delete-([a-f0-9]{32})\.(json|tmp)$/);
+        if (!match) continue;
+        const file = path.join(root, name);
+        if (privateEntry(file).size > 1024 * 1024) throw new Error('unsafe_deletion_intent');
+        if (match[2] === 'tmp') { fs.unlinkSync(file); continue; }
+        const intent = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (intent.version !== 1 || intent.id !== match[1] || typeof intent.title !== 'string' ||
+            intent.title.length > 200 || !Number.isFinite(intent.started) ||
+            !Object.hasOwn(intent, 'exports')) throw new Error('unsafe_deletion_intent');
+        validateSnapshot(intent.source, sourceName);
+        if (!intent.source) throw new Error('unsafe_deletion_intent');
+        this.deletions.set(intent.id, intent);
+      }
       for (const id of fs.readdirSync(root)) {
         if (id === 'writer.lock') continue;
+        if (/^delete-[a-f0-9]{32}\.json$/.test(id)) continue;
         if (id === 'exports') { privateEntry(path.join(root, id), true); continue; }
+        if (this.deletions.has(id)) {
+          this.totalBytes += snapshotBytes(ownedFiles(root, id, sourceName, this.deletions.get(id).source));
+          continue;
+        }
         if (!isId(id) || this.runs.size >= policy.maxRuns) throw new Error('unsafe_qa_storage');
         const dir = path.join(root, id);
-        privateEntry(dir, true);
+        const dirIdentity = identity(privateEntry(dir, true));
         let bytes = 0;
         for (const name of fs.readdirSync(dir)) {
           if (name !== 'events.jsonl' && !/^[a-f0-9]{32}\.jpg$/.test(name)) throw new Error('unsafe_qa_storage');
@@ -60,7 +142,7 @@ export class RunStore {
         if ((events.length && (events[0].kind !== 'run-start' || events[0].runId !== id)) ||
             events.length > policy.maxEvents + 1 ||
             events.some((e, i) => e.seq !== i + 1 || e.runId !== id)) throw new Error('invalid_qa_journal');
-        const run = { id, dir, file, events, bytes, journalBytes: end, started: events[0]?.at ?? Date.now(),
+        const run = { id, dir, dirIdentity, file, events, bytes, journalBytes: end, started: events[0]?.at ?? Date.now(),
           frames: events.filter(e => e.kind === 'frame').length, lastSample: 0 };
         this.runs.set(id, run);
         if (end !== raw.length) {
@@ -106,7 +188,7 @@ export class RunStore {
       throw new Error('recording_full');
     const id = opaque(), dir = path.join(this.root, id);
     fs.mkdirSync(dir, { mode: 0o700 });
-    const run = { id, dir, file: path.join(dir, 'events.jsonl'), events: [], bytes: 0, journalBytes: 0,
+    const run = { id, dir, dirIdentity: identity(privateEntry(dir, true)), file: path.join(dir, 'events.jsonl'), events: [], bytes: 0, journalBytes: 0,
       started: Date.now(), monoStart: performance.now(), frames: 0, lastSample: -Infinity };
     fs.writeFileSync(run.file, '', { flag: 'wx', mode: 0o600 });
     this.runs.set(id, run);
@@ -176,11 +258,12 @@ export class RunStore {
     return this.append(run, { kind: 'run-end', actor: 'broker', status, reason }, true);
   }
   get(id) {
+    if (this.deletions.has(id)) throw new Error('deletion_pending');
     if (!isId(id) || !this.runs.has(id)) throw new Error('run_not_found');
     return this.runs.get(id);
   }
   history() {
-    return [...this.runs.values()].reverse().map(r => ({ runId: r.id, started: r.started,
+    return [...this.runs.values()].filter(r => !this.deletions.has(r.id)).reverse().map(r => ({ runId: r.id, started: r.started,
       target: r.events[0]?.target ?? null, labels: r.events[0]?.labels ?? {}, events: r.events.length,
       status: r.events.at(-1)?.kind === 'run-end' ? r.events.at(-1).status : this.fault ? 'blocked' : 'running' }));
   }
@@ -191,5 +274,51 @@ export class RunStore {
     const file = path.join(r.dir, frameId + '.jpg');
     if (privateEntry(file).size > this.policy.maxImageBytes) throw new Error('invalid_frame');
     return fs.readFileSync(file);
+  }
+  deleteRun(id, exporter) {
+    let intent = this.deletions.get(id);
+    if (!intent) {
+      const run = this.get(id);
+      if (run.inflight || run.events.at(-1)?.kind !== 'run-end') throw new Error('run_active');
+      exporter.requireIdle(id);
+      intent = { version: 1, id, title: String(run.events[0]?.labels?.title ?? 'QA run').slice(0, 200),
+        started: run.started, source: ownedFiles(this.root, id, sourceName), exports: exporter.deletionFiles(id) };
+      if (!sameFile(intent.source, run.dirIdentity)) throw new Error('unsafe_deletion_storage');
+      const temporary = path.join(this.root, `delete-${id}.tmp`);
+      const fd = fs.openSync(temporary, 'wx', 0o600);
+      try {
+        fs.writeFileSync(fd, JSON.stringify(intent)); fs.fsyncSync(fd);
+        fs.renameSync(temporary, path.join(this.root, `delete-${id}.json`));
+        this.deletions.set(id, intent);
+      } finally {
+        const stat = fs.fstatSync(fd);
+        fs.closeSync(fd);
+        if (!this.deletions.has(id) && sameFile(privateEntry(temporary), stat)) fs.unlinkSync(temporary);
+      }
+      const root = directory(this.root);
+      try { fs.fsyncSync(root.fd); } finally { fs.closeSync(root.fd); }
+    }
+    exporter.requireIdle(id);
+    // Validate both ownership boundaries before touching either tree, including on recovery.
+    ownedFiles(this.root, id, sourceName, intent.source);
+    exporter.deletionFiles(id, intent.exports);
+    try {
+      exporter.removeFiles(id, intent.exports);
+      ownedFiles(this.root, id, sourceName, intent.source, true);
+      const file = path.join(this.root, `delete-${id}.json`);
+      privateEntry(file);
+      fs.unlinkSync(file);
+      this.deletions.delete(id);
+      this.runs.delete(id);
+      // Both media trees are already fsynced. A resurrected intent only repeats bounded cleanup.
+    } finally {
+      const remaining = snapshotBytes(ownedFiles(this.root, id, sourceName, intent.source));
+      const run = this.runs.get(id);
+      if (run) run.bytes = remaining;
+      this.totalBytes = [...this.runs.values()].reduce((sum, r) => sum + r.bytes, 0)
+        + [...this.deletions.values()].filter(d => !this.runs.has(d.id))
+          .reduce((sum, d) => sum + snapshotBytes(ownedFiles(this.root, d.id, sourceName, d.source)), 0);
+    }
+    return { runId: id, deleted: true };
   }
 }

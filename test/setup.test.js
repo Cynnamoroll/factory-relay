@@ -11,7 +11,7 @@ const project = fileURLToPath(new URL('..', import.meta.url));
 function checkout(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'factory relay setup '));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const name of ['scripts/setup.js', 'src/schema.js', 'package.json']) {
+  for (const name of ['scripts/setup.js', 'src/schema.js', 'src/qa-applications.js', 'src/window-target.js', 'web/target-identity.js', 'package.json']) {
     fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
     fs.copyFileSync(path.join(project, name), path.join(root, name));
   }

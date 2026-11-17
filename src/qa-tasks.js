@@ -1,16 +1,18 @@
 import { summarize, failure } from './qa-contract.js';
 import { qaEditPlan } from '../web/qa-edit.js';
+import { selectApplication } from './qa-applications.js';
+import { sampleBundle, isDesktop, sameTarget, targetIdentity, sameDisplayConfiguration } from './window-target.js';
 
 function owner(broker, actor, runId) {
   if (broker.current()?.id !== runId) throw new Error('run_mismatch');
   if (broker.owner?.actor !== actor) throw new Error('stale_control');
   return broker.owner.grant;
 }
-function image(broker) {
-  if (!broker.latest) return undefined;
-  return { mimeType: 'image/jpeg', data: broker.latest.image.toString('base64'),
-    version: broker.latest.version, ageMs: Math.round(performance.now() - broker.latest.receivedMono),
-    receivedAt: broker.latest.receivedAt };
+function image(broker, frame = broker.latest) {
+  if (!frame) return undefined;
+  return { mimeType: 'image/jpeg', data: frame.image.toString('base64'),
+    version: frame.version, ageMs: Math.round(performance.now() - frame.receivedMono),
+    receivedAt: frame.receivedAt };
 }
 const url = (broker, id, step) => `${broker.origin ?? ''}/#run=${id}${step ? '&step=' + step : ''}`;
 const markdownText = value => String(value).replace(/[\\`*_[\]<>#\r\n]/g, ' ').slice(0, 600);
@@ -27,7 +29,7 @@ export function report(broker, id) {
   const sourceArtifact = sourceExport.status === 'ready' ? broker.exports.artifact(id, 'recording.mp4').file : null;
   const replayUrl = url(broker, id, first?.stepId);
   const lines = [`### ${markdownText(summary.title)}`, `${summary.status.toUpperCase()} · ${summary.counts.pass} passed · ${summary.counts.fail} failed · ${summary.counts.blocked} blocked · ${summary.counts.uncertain} uncertain`,
-    ...checks.slice(0, 20).map(c => `- [${markdownText(c.title)}](${c.replayUrl}): **${c.status}**; expected ${c.expected}, observed ${c.actual ?? 'unavailable'}.${c.context ? ' ' + markdownText(c.context) : ''}${c.clip ? ` Source ${(c.clip.sourceStartMs / 1000).toFixed(3)}–${(c.clip.sourceEndMs / 1000).toFixed(3)}s; QA video ${(c.clip.startMs / 1000).toFixed(3)}–${(c.clip.endMs / 1000).toFixed(3)}s.` : ' No QA clip.'}`),
+    ...checks.slice(0, 20).map(c => `- [${markdownText(c.title)}](${c.replayUrl}): **${c.status}**; expected ${markdownText(c.expected)}, observed ${markdownText(c.actual ?? 'unavailable')}.${c.kind === 'visual' ? ` Visual assessment by ${c.assessment.actor}; not server-verified.` : ''}${c.context ? ' ' + markdownText(c.context) : ''}${c.clip ? ` Source ${(c.clip.sourceStartMs / 1000).toFixed(3)}–${(c.clip.sourceEndMs / 1000).toFixed(3)}s; QA video ${(c.clip.startMs / 1000).toFixed(3)}–${(c.clip.endMs / 1000).toFixed(3)}s.` : ' No QA clip.'}`),
     ...(summary.checks.length > 20 ? [`Showing ${Math.min(20, summary.checks.length)} of ${summary.checks.length} checks, non-passing first. Use paginated qa_replay for all results.`] : []),
     `[Open QA review](${replayUrl})`];
   if (artifacts['qa-v3-recording.mp4']) lines.push(`[![QA recording preview](${artifacts['qa-v3-poster.jpg']})](${replayUrl})`,
@@ -85,38 +87,85 @@ export async function readTask(broker, name, args) {
   }
 }
 export async function executeTask(broker, actor, name, args) {
+  if (name === 'qa_targets') {
+    const found = await broker.discover();
+    return { displays: found.filter(isDesktop), windows: found.filter(t => !isDesktop(t)), discoveredAt: Date.now(),
+      input: 'Desktop mouse covers all visible content on one selected display. Restricted windows must be foreground and unobscured at the input point.' };
+  }
   if (name === 'qa_start') {
     const active = broker.current();
+    const application = selectApplication(broker.applications, args, active?.events[0]);
+    const selectedApplication = { applicationId: application.id, application };
     if (active) {
       if (args.resumeRunId && args.resumeRunId !== active.id) throw new Error('run_mismatch');
+      if (args.target && !sameTarget(args.target, active.events[0].target))
+        throw new Error('target_mismatch');
       owner(broker, actor, active.id);
-      return { runId: active.id, resumed: true, controller: actor, target: broker.target, replayUrl: url(broker, active.id), nextAction: 'qa_observe' };
+      const startedAt = Number(active.events[0].labels?.processStartedAt);
+      if (Number.isFinite(startedAt)) {
+        broker.observation = null;
+        const current = await broker.native.observe(broker.lease, broker.target);
+        if (current.snapshot.processStartedAt !== startedAt)
+          throw new Error('target_mismatch');
+      }
+      return { runId: active.id, ...selectedApplication, resumed: true, controller: actor, target: broker.target, replayUrl: url(broker, active.id), nextAction: 'qa_observe' };
     }
     if (args.resumeRunId) throw new Error('run_not_active');
     if (broker.owner && broker.owner.actor !== actor) throw new Error('human_takeover_required');
-    if (!broker.owner) {
-      await broker.execute(actor, { op: 'connect' });
-      const target = args.target ?? (broker.windows.length === 1 ? broker.windows[0] : null);
-      if (!target) throw new Error(broker.windows.length ? 'target_ambiguous' : 'target_unavailable');
-      const { windowId, pid, bundleId } = target;
-      await broker.execute(actor, { op: 'select', target: { windowId, pid, bundleId } });
-      await broker.execute(actor, { op: 'take', takeover: false });
-    } else if (!broker.target) {
-      broker.windows = await broker.native.windows(broker.lease);
-      const selected = args.target ?? (broker.windows.length === 1 ? broker.windows[0] : null);
-      if (!selected) throw new Error(broker.windows.length ? 'target_ambiguous' : 'target_unavailable');
-      if (!broker.windows.some(w => w.windowId === selected.windowId && w.pid === selected.pid && w.bundleId === selected.bundleId))
-        throw new Error('target_unavailable');
-      const { windowId, pid, bundleId } = selected;
-      broker.target = { windowId, pid, bundleId };
-      broker.launch();
-    } else if (args.target && JSON.stringify(args.target) !== JSON.stringify(broker.target)) throw new Error('target_mismatch');
-    if (!await broker.waitFrame(0, 15000, true)) throw new Error('live_frame_required');
-    const { runId } = await broker.execute(actor, { op: 'start', grant: broker.owner.grant,
-      labels: { title: args.title, ...(args.context ? { context: args.context } : {}) } });
-    broker.owner.runId = runId;
-    return { runId, resumed: false, controller: actor, target: broker.target, replayUrl: url(broker, runId),
-      recording: { cadence: '5 Hz background sampling plus action evidence', maxDurationSeconds: 600, gaps: 'explicitly marked' }, nextAction: 'qa_observe' };
+    const hadOwner = Boolean(broker.owner);
+    let discovered;
+    if (args.target && args.target.bundleId !== sampleBundle) {
+      discovered = broker.targets().find(w => sameTarget(w, args.target));
+      if (!discovered || !isDesktop(discovered) && !Number.isFinite(discovered.processStartedAt) || !broker.discoveredAt ||
+          Date.now() - broker.discoveredAt > 30000) throw new Error('target_discovery_required');
+    }
+    try {
+      if (!broker.owner) {
+        await broker.execute(actor, { op: 'connect' });
+        if (discovered && !broker.targets().some(w => sameTarget(w, discovered) && (isDesktop(w)
+          ? sameDisplayConfiguration(w.displayConfiguration, discovered.displayConfiguration)
+          : w.processStartedAt === discovered.processStartedAt)))
+          throw new Error('target_mismatch');
+        const candidates = isDesktop(application) ? broker.displays.filter(d => d.main) : broker.windows.filter(w => w.bundleId === application.bundleId);
+        const target = args.target ?? (candidates.length === 1 ? candidates[0] : null);
+        if (!target) throw new Error(candidates.length ? 'target_ambiguous' : 'target_unavailable');
+        await broker.execute(actor, { op: 'select', target: targetIdentity(target) });
+        await broker.execute(actor, { op: 'take', takeover: false });
+      } else {
+        await broker.refreshTargets(broker.lease);
+        if (discovered && !broker.targets().some(w => sameTarget(w, discovered) && (isDesktop(w)
+          ? sameDisplayConfiguration(w.displayConfiguration, discovered.displayConfiguration)
+          : w.processStartedAt === discovered.processStartedAt))) throw new Error('target_mismatch');
+        const candidates = isDesktop(application) ? broker.displays.filter(d => d.main) : broker.windows.filter(w => w.bundleId === application.bundleId);
+        const selected = args.target ?? (candidates.length === 1 ? candidates[0] : null);
+        if (!selected) throw new Error(candidates.length ? 'target_ambiguous' : 'target_unavailable');
+        if (!broker.targets().some(w => sameTarget(w, selected)))
+          throw new Error('target_unavailable');
+        if (args.target && broker.target && !sameTarget(args.target, broker.target)) throw new Error('target_mismatch');
+        await broker.halt();
+        broker.target = targetIdentity(selected);
+        broker.targetProcessStartedAt = broker.windows.find(w => sameTarget(w, selected))?.processStartedAt;
+        if (!isDesktop(selected) && selected.bundleId !== sampleBundle && !Number.isFinite(broker.targetProcessStartedAt)) throw new Error('target_identity_required');
+        broker.launch();
+      }
+      if (!await broker.waitFrame(0, 15000)) throw new Error('live_frame_required');
+      const { runId } = await broker.execute(actor, { op: 'start', grant: broker.owner.grant,
+        labels: { title: args.title, applicationId: application.id, ...(args.context ? { context: args.context } : {}) } });
+      broker.owner.runId = runId;
+      return { runId, ...selectedApplication, resumed: false, controller: actor, target: broker.target, replayUrl: url(broker, runId),
+        recording: { cadence: '5 Hz background sampling plus action evidence', maxDurationSeconds: 600, gaps: 'explicitly marked' }, nextAction: 'qa_observe' };
+    } catch (error) {
+      if (!hadOwner && !broker.current()) {
+        await broker.halt();
+        const lease = broker.lease;
+        broker.lease = null; broker.owner = null; broker.observation = null; broker.connection = 'disconnected';
+        if (lease) {
+          try { await broker.native.release(lease); }
+          catch { broker.error = 'release_unconfirmed'; }
+        }
+      }
+      throw error;
+    }
   }
   if (name === 'qa_control') {
     if (actor !== 'human') throw new Error('human_takeover_required');
@@ -158,17 +207,24 @@ export async function executeTask(broker, actor, name, args) {
   }
   const grant = owner(broker, actor, args.runId);
   if (name === 'qa_observe') {
-    const observed = await broker.execute(actor, { op: 'observe', grant });
+    const observed = await broker.execute(actor, { op: 'observe', grant, ...(args.mode ? { mode: args.mode } : {}) });
     owner(broker, actor, args.runId);
     return { runId: args.runId, ...observed, canAct: true, expiresInMs: Math.max(0, broker.observation.expires - Date.now()),
-      ...(args.includeImage ? { image: image(broker) } : {}) };
+      ...(args.includeImage ? { image: image(broker, broker.observation.frame) } : {}) };
   }
-  if (name === 'qa_act') return { runId: args.runId,
-    ...await broker.execute(actor, { op: 'press', grant, observationId: args.observationId }) };
+  if (name === 'qa_act') {
+    const result = await broker.execute(actor, { op: args.action === 'mouse' ? 'mouse' : 'press', grant,
+      observationId: args.observationId, ...(args.action === 'mouse' ? { mouse: args.mouse } : {}) });
+    return { runId: args.runId, ...result,
+      ...(args.action === 'mouse' ? { image: image(broker, broker.observation.frame) } : {}) };
+  }
   if (name === 'qa_check') {
-    const check = await broker.execute(actor, { op: 'assert-count', grant, expected: args.expected, title: args.title, context: args.context });
+    const check = await broker.execute(actor, { op: args.kind === 'visual' ? 'assert-visual' : 'assert-count',
+      grant, expected: args.expected, title: args.title, context: args.context,
+      ...(args.kind === 'visual' ? { actual: args.actual, outcome: args.outcome, observationId: args.observationId } : {}) });
     return { runId: args.runId, stepId: check.stepId, title: check.title, status: check.status,
       expected: check.expected, actual: check.actual, context: check.context, observationId: check.observationId,
+      ...(check.checkKind ? { kind: check.checkKind, assessment: check.assessment, frameId: check.afterFrameId } : {}),
       replayUrl: url(broker, args.runId, check.stepId), retrySafe: true,
       nextAction: check.status === 'pass' ? 'Continue the run or qa_finish.' : 'Inspect the observed mismatch; do not silently relabel this failure.' };
   }

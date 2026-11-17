@@ -2,8 +2,10 @@
   "name": "factory-relay",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22" },
-  "description": "Shared Mac sample QA and replay evidence in Factory Droid.",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Shared Mac desktop QA and replay evidence in Factory Droid.",
   "license": "MIT",
   "scripts": {
     "test": "node --test",
@@ -16,8 +18,8 @@
     "qa": "node src/qa.js",
     "qa:mcp": "node src/qa-mcp.js",
     "qa:open": "node scripts/qa-open.js",
-    "qa:check": "node --check src/qa-store.js && node --check src/qa-broker.js && node --check src/qa-server.js && node --check src/qa.js && node --check src/qa-client.js && node --check src/qa-mcp.js && node --check src/qa-contract.js && node --check src/qa-tasks.js && node --check src/qa-export.js && node --check scripts/qa-open.js && node --check scripts/qa-acceptance.js && node --check scripts/qa-ui-fixture.js && node --check web/app.js && node --check web/qa-edit.js && node --check web/replay-entry.js",
-    "qa:test": "node --test test/qa.test.js test/qa-export.test.js"
+    "qa:check": "node --check src/window-target.js && node --check src/mouse.js && node --check src/qa-geometry.js && node --check src/qa-applications.js && node --check src/qa-store.js && node --check src/qa-broker.js && node --check src/qa-server.js && node --check src/qa.js && node --check src/qa-client.js && node --check src/qa-mcp.js && node --check src/qa-contract.js && node --check src/qa-tasks.js && node --check src/qa-export.js && node --check scripts/qa-open.js && node --check scripts/qa-acceptance.js && node --check scripts/qa-ui-fixture.js && node --check web/app.js && node --check web/qa-edit.js && node --check web/replay-entry.js && node --check web/target-identity.js",
+    "qa:test": "node --test test/qa-desktop.test.js test/qa-mouse.test.js test/qa-applications.test.js test/qa.test.js test/qa-export.test.js"
   },
   "keywords": [],
   "author": "",
