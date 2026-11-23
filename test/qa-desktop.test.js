@@ -141,7 +141,9 @@ test('discovery proves lease shape, main selection is not array order, status is
   assert.deepEqual(found.displays[1].displayConfiguration, configuration);
   assert.deepEqual(state.calls.map(c => c[0]), ['acquire', 'discover', 'release']);
   assert.equal(state.calls[0][2], 30);
-  const started = await broker.task('agent', 'qa_start', {});
+  await assert.rejects(broker.task('agent', 'qa_start', {}), /target_unavailable/);
+  assert.ok(!state.calls.some(([op]) => op === 'stream'), 'Never fall back to capturing a display');
+  const started = await broker.task('agent', 'qa_start', { applicationId: 'desktop' });
   assert.deepEqual(started.target, target);
   assert.equal(started.applicationId, 'desktop');
   assert.equal(broker.store.get(started.runId).events[0].labels.processStartedAt, undefined);
@@ -158,7 +160,7 @@ test('explicit display requires fresh discovery and no-main discovery never gues
   await broker.task('agent', 'qa_targets', {});
   assert.deepEqual((await broker.task('agent', 'qa_start', { target: secondary })).target, secondary);
   const absent = fixture(t); absent.state.displays.forEach(d => { d.main = false; });
-  await assert.rejects(absent.broker.task('agent', 'qa_start', {}), /target_unavailable/);
+  await assert.rejects(absent.broker.task('agent', 'qa_start', { applicationId: 'desktop' }), /target_unavailable/);
   assert.equal(absent.broker.lease, null);
 });
 
@@ -176,17 +178,17 @@ test('every explicit application array denies desktop without native calls or ac
   }
 });
 
-test('new no-target desktop start uses main display even after an owned secondary selection', async t => {
+test('explicit main desktop start works even after an owned secondary selection', async t => {
   const { broker } = fixture(t);
   await broker.command('human', { op: 'connect' });
   await broker.command('human', { op: 'select', target: secondary });
   await broker.command('human', { op: 'take' });
-  assert.deepEqual((await broker.task('human', 'qa_start', {})).target, target);
+  assert.deepEqual((await broker.task('human', 'qa_start', { applicationId: 'desktop' })).target, target);
 });
 
 test('desktop geometry binds exact identity, origin, size, resolution, scale and rotation without process sentinels', async t => {
   const { broker } = fixture(t);
-  const { runId } = await broker.task('agent', 'qa_start', {});
+  const { runId } = await broker.task('agent', 'qa_start', { applicationId: 'desktop' });
   const result = await broker.task('agent', 'qa_observe', { runId, includeImage: true });
   assert.deepEqual(result.displayConfiguration, configuration);
   assert.equal(result.windowRectPoints, undefined);
@@ -212,7 +214,7 @@ test('desktop geometry binds exact identity, origin, size, resolution, scale and
 test('four-second native observation plus idle heartbeats requires genuinely new capture, using startup budget', async t => {
   const { broker, state, store } = fixture(t);
   state.idle = true; state.observeMs = 4100; state.startupMs = 1650;
-  const { runId } = await broker.task('agent', 'qa_start', {});
+  const { runId } = await broker.task('agent', 'qa_start', { applicationId: 'desktop' });
   const initialVersion = broker.latest.version;
   const beforeCalls = state.calls.filter(c => c[0] === 'observe').length;
   const observation = await broker.task('agent', 'qa_observe', { runId, includeImage: true });
@@ -232,7 +234,7 @@ test('four-second native observation plus idle heartbeats requires genuinely new
 
 test('visual checks expire even while native verification is in flight', async t => {
   const { broker, state } = fixture(t);
-  const { runId } = await broker.task('agent', 'qa_start', {});
+  const { runId } = await broker.task('agent', 'qa_start', { applicationId: 'desktop' });
   const observed = await broker.task('agent', 'qa_observe', { runId });
   broker.observation.expires = Date.now() + 30;
   state.observeMs = 80;
@@ -244,7 +246,7 @@ test('visual checks expire even while native verification is in flight', async t
 
 test('desktop mouse forwarding is typed, single-use, stale/configuration fenced and never retried on uncertainty', async t => {
   const { broker, state, store } = fixture(t);
-  const { runId } = await broker.task('agent', 'qa_start', {});
+  const { runId } = await broker.task('agent', 'qa_start', { applicationId: 'desktop' });
   const commands = [{ kind: 'move', x: 0, y: 0.999 }, click, { ...click, button: 'right', count: 2 },
     { kind: 'drag', x: 0.1, y: 0.2, toX: 0.8, toY: 0.2, durationMs: 1000 },
     { kind: 'scroll', x: 0.5, y: 0.5, deltaX: -600, deltaY: 600 }];
@@ -269,7 +271,7 @@ test('desktop mouse forwarding is typed, single-use, stale/configuration fenced 
   assert.equal(store.get(runId).events.filter(e => e.kind === 'assertion').length, 0);
 });
 
-test('real MCP desktop default exports caller-assessed synthetic display pixels into an actual MP4', async t => {
+test('explicit MCP desktop run exports caller-assessed synthetic display pixels into an actual MP4', async t => {
   const { root, broker, state, store } = fixture(t);
   const jpeg = path.join(root, 'green.jpg');
   await mediaProcess('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=lime:s=640x400', '-frames:v', '1', '-threads', '2', jpeg]);
@@ -288,7 +290,7 @@ test('real MCP desktop default exports caller-assessed synthetic display pixels 
   assert.equal((await call('qa_status')).desktopAllowed, true);
   assert.deepEqual(state.calls, []);
   assert.equal((await call('qa_targets')).displays.length, 2);
-  const started = await call('qa_start', { title: 'Synthetic desktop evidence, not native QA' });
+  const started = await call('qa_start', { title: 'Synthetic desktop evidence, not native QA', applicationId: 'desktop' });
   assert.deepEqual(started.target, target);
   const { runId } = started;
   const observed = await call('qa_observe', { runId, includeImage: true });
@@ -306,7 +308,7 @@ test('real MCP desktop default exports caller-assessed synthetic display pixels 
   assert.match(report.reportMarkdown, /not server-verified/);
   assert.deepEqual(report.target, target);
   assert.ok(report.edit.segments.some(s => s.role === 'assessed-frame'));
-  const mp4 = report.artifacts['qa-v3-recording.mp4'];
+  const mp4 = report.artifacts['qa-v4-recording.mp4'];
   const probe = JSON.parse(await mediaProcess('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', mp4]));
   assert.ok(Number(probe.format.duration) > 0);
   const decoded = path.join(root, 'decoded.rgb');

@@ -14,9 +14,14 @@
   "RelayDemo/RelayDemo.xcodeproj/xcshareddata/xcschemes/RelayDemo.xcscheme": [
     "613c7ab95f8f1ebc624d4035fe262dcf4089c60836db58f41ba750934d664419"
   ],
+  "RelayMac/App.swift": [
+    "3d4bc8d5d7cfdfbb7f9a4b211a1dd25c9220cab5ca62907dcc5802be6dc81d51",
+    "c440ee6ebdc2b50764af29b5e950d3a9304eb3e7f41c8e0915119830f75f3e6d"
+  ],
   "RelayMac/RelayMac.xcodeproj/project.pbxproj": [
     "713a0d9de67ed3039ce28bf3b67f01feab0af0b44fadb794d908aa9d2eb05c5d",
-    "e1de022990d28dc2b07e196de912527ca741019e9a198891b5b1b0c594c890ba"
+    "e1de022990d28dc2b07e196de912527ca741019e9a198891b5b1b0c594c890ba",
+    "aa9549515c84d5f8659a9f6323366c654fe4453df4a4d7872992cc1be1a2d364"
   ],
   "RelayMac/RelayMac.xcodeproj/xcshareddata/xcschemes/RelayMac.xcscheme": [
     "137fffd27264ea036ba8ac69f3563e590157342f2ed2526d51669f20ad2586c8"

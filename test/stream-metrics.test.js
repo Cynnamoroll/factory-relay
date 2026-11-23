@@ -31,3 +31,25 @@ test('zero-frame failures and idle-only streams do not manufacture frame rates',
   assert.equal(result.deliveredSourceRateHz, null);
   assert.equal(result.receivedImageRateHz, null);
 });
+
+test('video metrics report access-unit rate, keyframe cadence and throughput', () => {
+  const video = [
+    { receivedAfterStartMs: 10, captureTimeSeconds: 100, sentUptimeSeconds: 1, bytes: 2000, sha256: 'k', replacedFrames: 0, keyframe: true },
+    { receivedAfterStartMs: 43, captureTimeSeconds: 100.033, sentUptimeSeconds: 1.033, bytes: 500, sha256: 'a', replacedFrames: 0, keyframe: false },
+    { receivedAfterStartMs: 76, captureTimeSeconds: 100.066, sentUptimeSeconds: 1.066, bytes: 600, sha256: 'b', replacedFrames: 0, keyframe: false },
+    { receivedAfterStartMs: 2010, captureTimeSeconds: 102, sentUptimeSeconds: 3, bytes: 2100, sha256: 'c', replacedFrames: 0, keyframe: true },
+  ];
+  const result = summarizeStream([], 0, video);
+  assert.equal(result.videoFrameCount, 4);
+  assert.equal(result.videoBytes, 5200);
+  assert.equal(result.videoKeyframes, 2);
+  assert.deepEqual(result.keyframeIntervalsSeconds, [2]);
+  assert.equal(result.keyframeMaxGapSeconds, 2);
+  assert.ok(Math.abs(result.receivedVideoRateHz - 1.5) < 1e-9);
+  assert.ok(Math.abs(result.videoDeliveredSourceRateHz - 1.5) < 1e-9);
+  assert.equal(result.videoBytesPerSecond, 2600);
+  const idle = summarizeStream([], 0, []);
+  assert.equal(idle.receivedVideoRateHz, null);
+  assert.equal(idle.videoBytesPerSecond, null);
+  assert.equal(idle.keyframeMaxGapSeconds, null);
+});

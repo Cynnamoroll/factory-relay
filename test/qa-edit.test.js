@@ -187,11 +187,11 @@ test('actual QA MP4 excludes distinct red setup/idle footage, preserves pass/fai
   assert.equal(broker.exports.state(run.id, 'qa').status, 'not_requested');
   const report = await broker.task('agent', 'qa_report', { runId: run.id, waitMs: 30000 });
   assert.equal(report.export.status, 'ready', JSON.stringify(report.export));
-  const qa = broker.exports.artifact(run.id, 'qa-v3-recording.mp4');
+  const qa = broker.exports.artifact(run.id, 'qa-v4-recording.mp4');
   const probe = JSON.parse(await mediaProcess('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', qa.file]));
   const seconds = Number(probe.format.duration);
   assert.ok(Math.abs(seconds - 1.8) < .1, `Independent duration ${seconds} must equal 1.8 seconds of evidence with no presentation dwell`);
-  const evidence = JSON.parse(fs.readFileSync(broker.exports.artifact(run.id, 'qa-v3-summary.json').file));
+  const evidence = JSON.parse(fs.readFileSync(broker.exports.artifact(run.id, 'qa-v4-summary.json').file));
   assert.ok(evidence.segments.some(s => s.kind === 'gap' && s.sourceStartMs > 3290 && s.sourceEndMs < 3520));
   const pixels = path.join(root, 'decoded.rgb');
   await mediaProcess('ffmpeg', ['-v', 'error', '-i', qa.file, '-vf', 'fps=40,crop=2:2:300:200,scale=1:1',
@@ -211,7 +211,7 @@ test('actual QA MP4 excludes distinct red setup/idle footage, preserves pass/fai
   assert.ok(pixelAt((assertionSegments[1].startMs + 400) / 1000).every(v => v < 50), 'The internal gap remains explicitly dark');
   assert.ok(evidence.edit.segments.every(s => s.kind === 'evidence'), 'No intro or result intervals are added');
   assert.ok(evidence.segments.every(s => ['frame', 'gap'].includes(s.kind)), 'Only recorded frames and missing-footage gaps are encoded');
-  assert.ok(!fs.readdirSync(path.join(broker.exports.root, run.id)).some(name => /^qa-v3-.*(?:card|srt|filter)/.test(name)));
+  assert.ok(!fs.readdirSync(path.join(broker.exports.root, run.id)).some(name => /^qa-v4-.*(?:card|srt|filter)/.test(name)));
   const top = path.join(root, 'footage-top.rgb');
   await mediaProcess('ffmpeg', ['-v', 'error', '-i', qa.file, '-frames:v', '1',
     '-vf', "fps=40,select='eq(n,8)',crop=600:30:170:6", '-f', 'rawvideo', '-pix_fmt', 'rgb24', top]);
@@ -223,20 +223,20 @@ test('actual QA MP4 excludes distinct red setup/idle footage, preserves pass/fai
   assert.equal(report.sourceArtifact, sourceFiles[0]);
   service = createQAServer(broker);
   const origin = await service.listen(0), auth = { Authorization: 'Bearer ' + service.agentToken, 'X-QA-Request': '1' };
-  for (const name of ['qa-v3-recording.mp4', 'recording.mp4', 'qa-v3-poster.jpg', 'qa-v3-summary.json']) {
+  for (const name of ['qa-v4-recording.mp4', 'recording.mp4', 'qa-v4-poster.jpg', 'qa-v4-summary.json']) {
     const route = `${origin}/api/runs/${run.id}/${name}`;
     assert.equal((await fetch(route, { headers: { ...auth, Range: 'bytes=0-15' } })).status, 206);
     assert.equal((await fetch(route, { headers: { 'Sec-Fetch-Site': 'same-origin' } })).status, 401);
     assert.equal((await fetch(route, { headers: { ...auth, Origin: 'https://evil.test' } })).status, 403);
     assert.equal((await fetch(route, { headers: { ...auth, Range: 'bytes=999999999-' } })).status, 416);
   }
-  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v3-state.json`, { headers: auth })).status, 404);
+  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v4-state.json`, { headers: auth })).status, 404);
   const pair = await fetch(origin + '/session', { method: 'POST',
     headers: { Origin: origin, 'Content-Type': 'application/json', 'X-QA-Request': '1' }, body: JSON.stringify({ code: service.pairingCode }) });
-  const cookie = pair.headers.get('set-cookie').split(';')[0], route = `${origin}/api/runs/${run.id}/qa-v3-recording.mp4`;
+  const cookie = pair.headers.get('set-cookie').split(';')[0], route = `${origin}/api/runs/${run.id}/qa-v4-recording.mp4`;
   assert.equal((await fetch(route, { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin', Range: 'bytes=-16' } })).status, 206);
   assert.equal((await fetch(route, { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
-  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v3-card-0-result.jpg`, { headers: auth })).status, 404);
+  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v4-card-0-result.jpg`, { headers: auth })).status, 404);
   await broker.exports.close();
   const reopened = new Exporter(store);
   assert.equal(reopened.state(run.id).status, 'ready');
@@ -261,7 +261,7 @@ test('source and QA exports share one worker and one bounded queue; empty QA nev
   const state = await exporter.wait(run.id, 30000, 'qa');
   assert.equal(state.code, 'qa_no_completed_checks');
   assert.equal(exporter.state(run.id).status, 'not_requested');
-  assert.throws(() => exporter.artifact(run.id, 'qa-v3-recording.mp4'), /export_not_ready/);
+  assert.throws(() => exporter.artifact(run.id, 'qa-v4-recording.mp4'), /export_not_ready/);
   let active = 0;
   exporter.encode = async (_id, signal) => {
     assert.equal(++active, 1);
@@ -288,12 +288,12 @@ test('QA artifact names retain private-file checks, strict whitelist and combine
   const run = store.start({}, {}, 'agent'); store.finish(run, 'uncertain', 'safety fixture');
   exporter.save(run.id, { status: 'ready' }, 'qa');
   const directory = path.join(exporter.root, run.id);
-  fs.writeFileSync(path.join(directory, 'qa-v3-summary.json'), 'x'.repeat(4096), { mode: 0o600 });
+  fs.writeFileSync(path.join(directory, 'qa-v4-summary.json'), 'x'.repeat(4096), { mode: 0o600 });
   assert.ok(exporter.bytes() >= 4096);
   assert.throws(() => new Exporter(store, { ...EXPORT_POLICY, totalBytes: 1024 }), /export_storage_full/);
-  assert.throws(() => exporter.artifact(run.id, 'qa-v3-state.json'), /export_not_ready/);
-  assert.throws(() => exporter.artifact(run.id, '../qa-v3-summary.json'), /export_not_ready/);
-  fs.symlinkSync(run.file, path.join(directory, 'qa-v3-recording.mp4'));
-  assert.throws(() => exporter.artifact(run.id, 'qa-v3-recording.mp4'), /unsafe_export_storage/);
+  assert.throws(() => exporter.artifact(run.id, 'qa-v4-state.json'), /export_not_ready/);
+  assert.throws(() => exporter.artifact(run.id, '../qa-v4-summary.json'), /export_not_ready/);
+  fs.symlinkSync(run.file, path.join(directory, 'qa-v4-recording.mp4'));
+  assert.throws(() => exporter.artifact(run.id, 'qa-v4-recording.mp4'), /unsafe_export_storage/);
   assert.throws(() => new Exporter(store), /unsafe_export_storage/);
 });

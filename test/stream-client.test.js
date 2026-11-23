@@ -54,7 +54,7 @@ process.stdin.once('data', data => {
   }
   process.env.APPLETS_CLIENT_TEST = 'diagnostic';
   let result;
-  assert.deepEqual(await consumeHost(config, { lease, mode: 'diagnose' }, packet => { result = packet.header; }), { frames: 0 });
+  assert.deepEqual(await consumeHost(config, { lease, mode: 'diagnose' }, packet => { result = packet.header; }), { frames: 0, video: 0 });
   assert.equal(result.launchMode, 'launchservices-ipc');
   process.env.APPLETS_CLIENT_TEST = 'stream';
   const controller = new AbortController();

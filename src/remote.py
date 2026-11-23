@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager
 
 LIMIT = 1024 * 1024
 APPLE = {"xcrun": "/usr/bin/xcrun", "xcodebuild": "/usr/bin/xcodebuild"}
@@ -44,24 +45,107 @@ def private_open(path):
     return os.fdopen(fd, "r+")
 
 
+MAX_LEASES = 64
+STATE_LIMIT = 65536
+
+
+def valid_window_target(target):
+    return (type(target) is dict and set(target) == {"windowId", "pid", "bundleId"}
+            and type(target["windowId"]) is int and 0 < target["windowId"] < 2**32
+            and type(target["pid"]) is int and 0 < target["pid"] < 2**31
+            and isinstance(target["bundleId"], str) and len(target["bundleId"]) <= 255
+            and re.fullmatch(r"[A-Za-z0-9._-]*", target["bundleId"]) is not None
+            and target["bundleId"] not in ("com.factory.applets.host", "com.apple.iphonesimulator", "com.apple.dt.Devices"))
+
+
+def valid_scope(scope):
+    if type(scope) is not dict or scope.get("kind") not in ("exclusive", "observer", "window"):
+        return False
+    if scope["kind"] == "window":
+        return set(scope) == {"kind", "target"} and valid_window_target(scope["target"])
+    return set(scope) == {"kind"}
+
+
+def valid_lease(lease):
+    return (type(lease) is dict and set(lease) == {"owner", "token", "expiresAt", "generation", "scope"}
+            and isinstance(lease["owner"], str) and isinstance(lease["token"], str)
+            and re.fullmatch("[a-f0-9]{64}", lease["token"]) is not None
+            and type(lease["expiresAt"]) in (float, int) and type(lease["generation"]) is int
+            and 0 < lease["generation"] < 2**53 - 1 and valid_scope(lease["scope"]))
+
+
 def read_state(root):
+    """Version 1 held one global lease. It migrates to one exclusive lease with the same proof."""
     with private_open(root / "state.json") as handle:
-        raw = handle.read(16385)
+        raw = handle.read(STATE_LIMIT + 1)
     if not raw:
-        return {"generation": 0, "lease": None}
+        return {"version": 2, "generation": 0, "leases": []}
     try:
+        assert len(raw) <= STATE_LIMIT
         state = json.loads(raw)
-        assert set(state) == {"generation", "lease"}
+        assert type(state) is dict
+        if set(state) == {"generation", "lease"}:
+            assert type(state["generation"]) is int and 0 <= state["generation"] < 2**53 - 1
+            lease = state["lease"]
+            leases = []
+            if lease is not None:
+                assert set(lease) == {"owner", "token", "expiresAt"}
+                leases.append(dict(lease, generation=state["generation"], scope={"kind": "exclusive"}))
+            state = {"version": 2, "generation": state["generation"], "leases": leases}
+        assert set(state) == {"version", "generation", "leases"} and state["version"] == 2
         assert type(state["generation"]) is int and 0 <= state["generation"] < 2**53 - 1
-        lease = state["lease"]
-        if lease is not None:
-            assert set(lease) == {"owner", "token", "expiresAt"}
-            assert isinstance(lease["owner"], str)
-            assert re.fullmatch("[a-f0-9]{64}", lease["token"])
-            assert isinstance(lease["expiresAt"], (float, int))
+        assert type(state["leases"]) is list and len(state["leases"]) <= MAX_LEASES
+        assert all(valid_lease(lease) and lease["generation"] <= state["generation"] for lease in state["leases"])
+        assert len({lease["token"] for lease in state["leases"]}) == len(state["leases"])
         return state
     except (ValueError, AssertionError, TypeError, KeyError):
         raise Failure("unsafe_state")
+
+
+def same_window(a, b):
+    return a["windowId"] == b["windowId"] and a["pid"] == b["pid"]
+
+
+def conflicts(scope, other):
+    """Window leases coexist only for distinct targets; exclusive leases fence everything else."""
+    if scope["kind"] == "exclusive" or other["kind"] == "exclusive":
+        return True
+    if scope["kind"] == "window" and other["kind"] == "window":
+        return same_window(scope["target"], other["target"])
+    return False
+
+
+def lease_allows(lease, target, access):
+    """access: discover, read (pixels/AX), or mutate (input)."""
+    scope = lease["scope"]
+    if scope["kind"] == "exclusive" or access == "discover":
+        return True
+    if target is None or target.get("kind") == "desktop":
+        return False
+    if scope["kind"] == "window":
+        return same_window(scope["target"], target) and scope["target"]["bundleId"] == target.get("bundleId")
+    return access == "read"
+
+
+def require_access(lease, target, access):
+    if not lease_allows(lease, target, access):
+        raise Failure("lease_scope")
+    return lease
+
+
+@contextmanager
+def state_lock(root, shared=False, wait=2):
+    with private_open(root / "lock") as lock:
+        until = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(lock, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= until:
+                    raise Failure("busy")
+                time.sleep(0.01)
+        yield lock
 
 
 def write_state(root, state):
@@ -83,15 +167,17 @@ def write_state(root, state):
 
 
 def verify_lease(state, request):
-    lease = state["lease"]
     proof = request["args"]["lease"]
-    if (lease is None or proof["generation"] != state["generation"]
-            or request["owner"] != lease["owner"]
-            or not secrets.compare_digest(proof["token"], lease["token"])):
+    found = None
+    for lease in state["leases"]:
+        # Compare every token so timing does not reveal which lease matched.
+        if secrets.compare_digest(proof["token"], lease["token"]):
+            found = lease
+    if found is None or proof["generation"] != found["generation"] or request["owner"] != found["owner"]:
         raise Failure("stale_lease")
-    if lease["expiresAt"] <= time.time():
+    if found["expiresAt"] <= time.time():
         raise Failure("lease_expired")
-    return lease
+    return found
 
 
 def execute(argv, deadline, cwd=None):
@@ -186,18 +272,28 @@ def perform(request, root, state):
     operation, args = request["operation"], request["args"]
     deadline = time.monotonic() + request["timeout"]
     if operation == "acquire":
-        current = state["lease"]
-        if current and current["expiresAt"] > time.time() and not args["takeover"]:
+        scope = args.get("scope", {"kind": "exclusive"})
+        if not valid_scope(scope):
+            raise Failure("invalid_request")
+        now = time.time()
+        live = [lease for lease in state["leases"] if lease["expiresAt"] > now]
+        blocking = [lease for lease in live if conflicts(scope, lease["scope"])]
+        if blocking and not args["takeover"]:
             raise Failure("lease_held")
+        live = [lease for lease in live if not conflicts(scope, lease["scope"])]
+        if len(live) >= MAX_LEASES:
+            raise Failure("busy")
         state["generation"] += 1
-        state["lease"] = {"owner": request["owner"], "token": secrets.token_hex(32),
-                          "expiresAt": time.time() + args["ttlSeconds"]}
+        lease = {"owner": request["owner"], "token": secrets.token_hex(32), "expiresAt": now + args["ttlSeconds"],
+                 "generation": state["generation"], "scope": scope}
+        state["leases"] = live + [lease]
         write_state(root, state)
-        return dict(state["lease"], generation=state["generation"])
+        return dict(lease)
     if operation == "release":
-        verify_lease(state, request)
+        lease = verify_lease(state, request)
         state["generation"] += 1
-        state["lease"] = None
+        state["leases"] = [item for item in state["leases"]
+                           if item is not lease and item["expiresAt"] > time.time()]
         write_state(root, state)
         return {"released": True, "generation": state["generation"]}
     if operation == "preflight":
@@ -214,7 +310,7 @@ def perform(request, root, state):
     if operation == "simulators":
         return simulator_list(execute([APPLE["xcrun"], "simctl", "list", "devices", "--json"], deadline))
 
-    lease = verify_lease(state, request)
+    lease = require_access(verify_lease(state, request), None, "mutate")
     deadline = min(deadline, time.monotonic() + lease["expiresAt"] - time.time())
     workspace = request["workspace"]
     if operation in ("observe", "tap", "frame"):
@@ -280,16 +376,7 @@ def main():
         root = private_directory(Path.home() / ".applets-control")
         DIAGNOSTIC_ROOT = private_directory(root / "diagnostics")
         DIAGNOSTIC_OPERATION = request["operation"]
-        with private_open(root / "lock") as lock:
-            until = time.monotonic() + 2
-            while True:
-                try:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    break
-                except BlockingIOError:
-                    if time.monotonic() >= until:
-                        raise Failure("busy")
-                    time.sleep(0.025)
+        with state_lock(root):
             if (root / "inflight").exists() or (root / "bridge-session.json").exists():
                 raise Failure("busy")
             result = perform(request, root, read_state(root))

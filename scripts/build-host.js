@@ -2,12 +2,19 @@ import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { loadConfig, quote, run } from '../src/transport.js';
+import { appIconIcns } from './app-icon.js';
 
-export const hostSourceNames = ['AppletsHost.swift', 'HostLifecycle.swift', 'AppletsControl.swift', 'Info.plist'];
+export const hostSourceNames = ['AppletsHost.swift', 'HostLifecycle.swift', 'AppletsControl.swift', 'Info.plist', 'AppIcon.icns'];
+/** Text sources are read from the repository; the icon is rendered from scripts/app-icon.js and sent as base64. */
+export async function hostFiles() {
+  return Object.fromEntries(await Promise.all(hostSourceNames.map(async name => [name, name === 'AppIcon.icns'
+    ? appIconIcns().toString('base64')
+    : await readFile(new URL((name === 'AppletsControl.swift' ? '../control/' : '../host/') + name, import.meta.url), 'utf8')])));
+}
 const base = (await readFile(new URL('../src/remote.py', import.meta.url), 'utf8'))
   .replace('if __name__ == "__main__":\n    main()', '');
 export const hostBuildSource = base + `
-import hashlib,tempfile,zipfile
+import base64,hashlib,socket,tempfile,zipfile
 os.umask(0o077)
 data=json.load(sys.stdin)
 workspace=Path(data["workspace"])
@@ -27,22 +34,43 @@ def validate():
         manifest=root/"authored-sha256.json"
         if not manifest.is_file() or manifest.is_symlink() or snapshot(root)!=json.loads(manifest.read_text()):
             raise RuntimeError("Refusing unknown or changed helper-owned files")
-def idle():
+def stop_serving():
+    # The persistent host would keep the old executable running; ask it to exit under the exclusive lease.
+    endpoint=authority/"host"/"relay.sock"
+    if not endpoint.is_socket(): return
+    try:
+        with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as connection:
+            connection.settimeout(3)
+            connection.connect(str(endpoint))
+            connection.recv(1024)
+            connection.sendall(b'{"type":"control"}\\n{"id":1,"operation":"shutdown"}\\n')
+            connection.recv(1024)
+    except OSError:
+        pass
+    for _ in range(50):
+        if not endpoint.exists(): return
+        time.sleep(0.1)
+def idle(allow_serving=False):
     if (authority/"inflight").exists() or (authority/"bridge-session.json").exists(): raise Failure("busy")
-    verify_lease(read_state(authority),data)
+    if verify_lease(read_state(authority),data)["scope"]["kind"]!="exclusive": raise Failure("lease_scope")
     commands=subprocess.check_output(["/bin/ps","-axo","command="],text=True).splitlines()
     executables=tuple(str(root/name/"Contents/MacOS/AppletsHost") for name in ("Applets Host.app","Factory Relay.app"))
-    if any(c.strip().startswith(executables) for c in commands): raise Failure("busy")
+    # Reusing an approved host changes nothing, so a running background host may keep serving.
+    if any(c.strip().startswith(executables) and not (allow_serving and " serve " in c) for c in commands): raise Failure("busy")
 with private_open(authority/"lock") as lock:
     fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-    idle()
+    if (authority/"inflight").exists() or (authority/"bridge-session.json").exists(): raise Failure("busy")
+    if verify_lease(read_state(authority),data)["scope"]["kind"]!="exclusive": raise Failure("lease_scope")
     validate()
+    if not data.get("onlyIfAbsent"): stop_serving()
+    idle(allow_serving=bool(data.get("onlyIfAbsent")))
     if data.get("onlyIfAbsent") and root.exists():
         if (root/"Applets Host.app").exists():
             raise RuntimeError("Existing Applets Host requires an intentional upgrade to Factory Relay; run node scripts/build-host.js <config.json> first. Setup will not rebuild an approved host.")
         for name,body in data["files"].items():
-            relative="Factory Relay.app/Contents/Info.plist" if name=="Info.plist" else name
-            if not (root/relative).is_file() or (root/relative).read_text()!=body:
+            relative="Factory Relay.app/Contents/Info.plist" if name=="Info.plist" else "Factory Relay.app/Contents/Resources/AppIcon.icns" if name=="AppIcon.icns" else name
+            expected=base64.b64decode(body) if name=="AppIcon.icns" else body.encode()
+            if not (root/relative).is_file() or (root/relative).read_bytes()!=expected:
                 raise RuntimeError("Existing host sources differ; setup will not rebuild an approved host")
         app=root/"Factory Relay.app"
         if sorted(p.name for p in (app/"Contents/MacOS").iterdir())!=["AppletsHost"]:
@@ -59,6 +87,8 @@ with private_open(authority/"lock") as lock:
         for name in ("AppletsHost.swift","HostLifecycle.swift","AppletsControl.swift"):
             (stage/name).write_text(data["files"][name])
         (app/"Contents/Info.plist").write_text(data["files"]["Info.plist"])
+        (app/"Contents/Resources").mkdir()
+        (app/"Contents/Resources/AppIcon.icns").write_bytes(base64.b64decode(data["files"]["AppIcon.icns"],validate=True))
         subprocess.run(["/usr/bin/xcrun","swiftc","-parse-as-library","-swift-version","5",
             "-target","arm64-apple-macos14.0","-O",
             *[str(stage/name) for name in ("AppletsHost.swift","HostLifecycle.swift","AppletsControl.swift")],
@@ -97,8 +127,7 @@ with private_open(authority/"lock") as lock:
 export async function buildHost(configPath, { onlyIfAbsent = false } = {}) {
   const config = await loadConfig(configPath);
   if (config.transport !== 'factory') throw new Error('Factory relay required');
-  const files = Object.fromEntries(await Promise.all(hostSourceNames.map(async name =>
-    [name, await readFile(new URL((name === 'AppletsControl.swift' ? '../control/' : '../host/') + name, import.meta.url), 'utf8')])));
+  const files = await hostFiles();
   const { token, generation } = await run(config, 'acquire', { ttlSeconds: 240 });
   const lease = { token, generation };
   try {

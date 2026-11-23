@@ -87,10 +87,61 @@ test('idle heartbeats are not images or new captured frames', async () => {
   assert.equal(result[1].image.length, 0);
 });
 
+const sps = [0x67, 0x64, 0x00, 0x28, 0xac, 0xd9, 0x40, 0x78];
+const pps = [0x68, 0xee, 0x3c, 0x80];
+const idr = [0x65, 0x88, 0x84, 0x21, 0xa0];
+const start = [0, 0, 0, 1];
+const keyAU = Buffer.from([...start, ...sps, ...start, ...pps, ...start, ...idr]);
+const deltaAU = Buffer.from([...start, 0x41, 0x9a, 0x22, 0x11]);
+const vframe = { protocol: 1, type: 'vframe', sequence: 2, windowId: 5, pid: 12,
+  bundleId: 'com.factory.applets.RelayMac', codec: 'h264', format: 'annexb', keyframe: true,
+  width: 200, height: 100, captureTimeSeconds: 10, sentUptimeSeconds: 10.1,
+  contentRectPixels: [0, 0, 200, 100], initialWindowRectPoints: [5, 8, 100, 50],
+  contentScale: 1, scaleFactor: 2, replacedFrames: 0, bytes: keyAU.length };
+
+test('video access units decode alongside frames with one shared monotonic sequence', async () => {
+  const key = packet(vframe, keyAU);
+  const result = await collect([packet(), key, packet({ ...vframe, sequence: 3, keyframe: false, bytes: deltaAU.length }, deltaAU),
+    packet({ ...frame, sequence: 4 })]);
+  assert.deepEqual(result.map(p => p.header.type), ['frame', 'vframe', 'vframe', 'frame']);
+  assert.equal(result[1].header.keyframe, true);
+  assert.equal(result[1].header.codec, 'h264');
+  assert.deepEqual(result[1].image, keyAU);
+  assert.equal(result[2].header.keyframe, false);
+  await assert.rejects(collect([packet(), packet({ ...vframe, sequence: 1 }, keyAU)]), /invalid_stream_frame/,
+    'A vframe may not reuse or lower the shared sequence');
+  await assert.rejects(collect([packet(vframe, keyAU), packet({ ...frame, sequence: 1 })]), /invalid_stream_frame/,
+    'A frame may not reuse or lower the shared sequence');
+});
+
+test('video headers are strict and access units are structurally validated', async () => {
+  for (const bad of [
+    { ...vframe, codec: 'h265' }, { ...vframe, format: 'avcc' }, { ...vframe, keyframe: 'yes' },
+    { ...vframe, width: 0 }, { ...vframe, width: 2049 }, { ...vframe, bytes: IMAGE_LIMIT + 1 },
+    { ...vframe, unexpected: true }, { protocol: 1, type: 'vframe', sequence: 1 },
+  ]) await assert.rejects(collect([packet(bad, keyAU)]));
+  // A keyframe access unit must carry SPS, PPS and an IDR slice for mid-stream joins.
+  await assert.rejects(collect([packet({ ...vframe, bytes: deltaAU.length }, deltaAU)]), /invalid_stream_frame/);
+  const noVcl = Buffer.from([...start, ...sps, ...start, ...pps]);
+  await assert.rejects(collect([packet({ ...vframe, keyframe: false, bytes: noVcl.length }, noVcl)]), /invalid_stream_frame/);
+  for (const malformed of [
+    Buffer.from([1, 2, 3, 4, 5, 6]),                                    // no start code
+    Buffer.from([...start]),                                            // empty NAL
+    Buffer.from([...start, 0x80 | 0x65, 0x88]),                         // forbidden bit set
+    Buffer.from([...start, 0x00, 0x88]),                                // NAL type 0
+    Buffer.from([...start, 0x7f, 0x88]),                                // NAL type above 23
+    Buffer.from([...start, ...idr, ...start, ...start, ...idr]),        // zero-length middle NAL
+  ]) await assert.rejects(collect([packet({ ...vframe, bytes: malformed.length }, malformed)]), /invalid_stream_frame/);
+  // Non-key access units join the stream after a keyframe without parameter sets.
+  const joined = await collect([packet(vframe, keyAU),
+    packet({ ...vframe, sequence: 3, keyframe: false, bytes: deltaAU.length }, deltaAU)]);
+  assert.equal(joined.length, 2);
+});
+
 test('supervisor uses shared fencing, busy markers, acknowledgment bounds and disconnect cleanup', () => {
   const result = spawnSync('python3', ['test/stream-supervisor.py'], {
     cwd: new URL('../', import.meta.url), encoding: 'utf8', timeout: 20000,
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /shared fencing and cleanup passed/);
+  assert.match(result.stdout, /pipelined credits, revocation, scope, busy fencing, discovery and video relay passed/);
 });

@@ -244,6 +244,10 @@ test('HTTP capabilities, Host/Origin/CSRF, one-time pairing, bounded requests an
   assert.equal((await get('/api/status')).status, 403);
   assert.equal((await get('/api/status', { 'X-QA-Request': '1' })).status, 401);
   assert.equal((await get('/api/status', { ...auth, Origin: 'https://evil.example' })).status, 403);
+  const liveModule = await get('/live-video.js', auth);
+  assert.equal(liveModule.status, 200, 'The browser import for live video must be served');
+  assert.match(liveModule.headers.get('content-type'), /javascript/);
+  assert.match(await liveModule.text(), /export function parseAnnexB/);
   const wrongHost = await new Promise((resolve, reject) => {
     const request = http.get(origin + '/api/status', { headers: { ...auth, Host: 'evil.example' } },
       response => { response.resume(); resolve(response.statusCode); });
@@ -327,7 +331,8 @@ test('official MCP client joins the same broker, hides grants, returns shared pi
   const status = await call('qa_status');
   assert.deepEqual(status.applications, [{
     id: 'relaymac', name: 'RelayMac', platform: 'macos', bundleId: target.bundleId,
-    capabilities: { sharedQA: true, observe: ['pixels', 'count'], act: ['mouse', 'increment'], check: ['visual', 'count'], recording: true },
+    capabilities: { sharedQA: true, observe: ['pixels', 'count'], act: ['mouse', 'increment'], check: ['visual', 'count'], recording: true,
+      mouse: { route: 'background-ax-press', lease: 'window', kinds: ['click'], buttons: ['left'], counts: [1] } },
   }]);
   assert.equal(status.connection, 'disconnected', 'Capabilities describe implemented support, not runtime readiness');
   assert.deepEqual(native.calls, [], 'Reading capabilities via MCP never acquires or discovers native state');
@@ -427,6 +432,7 @@ test('HTTP generic Mac profile status is read-only, private and does not claim r
   const status = await response.json();
   assert.deepEqual(status.applications, [{ ...otherProfile, capabilities: {
     sharedQA: true, observe: ['pixels'], act: ['mouse'], check: ['visual'], recording: true,
+    mouse: { route: 'background-ax-press', lease: 'window', kinds: ['click'], buttons: ['left'], counts: [1] },
   } }]);
   assert.deepEqual(status.windows, []);
   assert.equal(status.target, null);

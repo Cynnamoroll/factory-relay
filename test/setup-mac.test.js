@@ -67,7 +67,7 @@ test('setup:mac builds once, opens the sample, reuses approved host and releases
   const m = machine(t), first = m.run();
   assert.equal(first.status, 0, first.stderr);
   assert.match(first.stdout, /Factory Relay Mac setup complete/);
-  assert.equal(m.state().lease, null);
+  assert.deepEqual(m.state().leases, []);
   assert.equal(m.calls().filter(x => x === 'native:swiftc').length, 1);
   assert.ok(m.calls().includes('upload'));
   assert.ok(m.calls().includes('build'));
@@ -81,7 +81,7 @@ test('setup:mac builds once, opens the sample, reuses approved host and releases
   assert.match(second.stdout, /"rebuilt": false/);
   assert.deepEqual({ bytes: fs.readFileSync(exe), mtime: fs.statSync(exe).mtimeMs }, before);
   assert.equal(m.calls().filter(x => x === 'native:swiftc').length, 1, 'Repeat setup must not compile the approved host');
-  assert.equal(m.state().lease, null);
+  assert.deepEqual(m.state().leases, []);
   assert.equal(fs.existsSync(path.join(m.root, '.applets-control/inflight')), false);
   assert.equal(fs.readdirSync(path.dirname(m.host)).some(n => n.startsWith('.applets-host-backup-')), false);
   assert.doesNotMatch(first.stdout + first.stderr + second.stdout + second.stderr, /"token"\s*:/);
@@ -91,7 +91,7 @@ test('setup:mac releases its lease on host, upload, build and launch errors', t 
   for (const failure of ['host', 'upload', 'build', 'launch']) {
     const m = machine(t), result = m.run(failure);
     assert.equal(result.status, 1, failure);
-    assert.equal(m.state().lease, null, failure + ' must release the lease');
+    assert.deepEqual(m.state().leases, [], failure + ' must release the lease');
     assert.equal(fs.existsSync(path.join(m.root, '.applets-control/inflight')), false);
     if (failure !== 'launch') assert.equal(m.calls().includes('launch'), false);
     assert.doesNotMatch(result.stdout + result.stderr, /"token"\s*:/);
@@ -121,7 +121,7 @@ test('setup:mac refuses changed host files and recognized but outdated host sour
   let result = m.run();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Refusing unknown or changed/);
-  assert.equal(m.state().lease, null);
+  assert.deepEqual(m.state().leases, []);
   assert.equal(m.calls().slice(before).includes('native:swiftc'), false);
   const manifest = path.join(m.host, 'authored-sha256.json');
   const update = spawnSync('python3', ['-c', 'import hashlib,json,pathlib,sys; p=pathlib.Path(sys.argv[1]); m=json.loads(p.read_text()); m["AppletsHost.swift"]=hashlib.sha256((p.parent/"AppletsHost.swift").read_bytes()).hexdigest(); p.write_text(json.dumps(m))', manifest], { encoding: 'utf8' });
@@ -129,6 +129,6 @@ test('setup:mac refuses changed host files and recognized but outdated host sour
   result = m.run();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /setup will not rebuild an approved host/);
-  assert.equal(m.state().lease, null);
+  assert.deepEqual(m.state().leases, []);
   assert.equal(m.calls().slice(before).includes('native:swiftc'), false);
 });

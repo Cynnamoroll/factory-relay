@@ -27,7 +27,7 @@ function recording(broker, title = 'Disposable recording', finish = true) {
 function exportsFor(broker, id) {
   broker.exports.save(id, { status: 'ready' });
   const dir = path.join(broker.exports.root, id);
-  for (const name of ['recording.mp4', 'poster.jpg', 'summary.json', 'qa-recording.mp4', 'qa-v2-poster.jpg', 'qa-v3-summary.json'])
+  for (const name of ['recording.mp4', 'poster.jpg', 'summary.json', 'qa-recording.mp4', 'qa-v2-poster.jpg', 'qa-v4-summary.json'])
     fs.writeFileSync(path.join(dir, name), Buffer.alloc(24), { mode: 0o600 });
   return dir;
 }

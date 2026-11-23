@@ -14,7 +14,7 @@ try {
       assert.equal(header.bundleId, 'com.factory.applets.host');
       assert.equal(header.bundlePath, config.workspace + '/.applets-host/Factory Relay.app');
       assert.equal(header.executablePath, header.bundlePath + '/Contents/MacOS/AppletsHost');
-      assert.equal(header.launchMode, 'launchservices-ipc');
+      assert.equal(header.launchMode, 'persistent-ipc');
       assert.equal(header.permissionRequested, false);
       assert.equal(header.stage, 'app_ready');
       assert.deepEqual(header.lifecycle, {
@@ -24,7 +24,7 @@ try {
       console.log(JSON.stringify(header));
     });
   }
-  assert.equal(pids.size, 2, 'Reconnect must launch a fresh helper with the same app identity');
+  assert.equal(pids.size, 1, 'Reconnects reuse the one persistent helper instead of relaunching it');
 } finally {
   await run(config, 'release', { lease });
 }

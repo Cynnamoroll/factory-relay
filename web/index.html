@@ -5,24 +5,27 @@
 <body>
 <main>
 <section id="pair" class="pair-panel"><h1>Connect QA workspace</h1>
-<p>Pair this pane with your local broker to view the selected Mac display or restricted window and saved recordings.</p>
+<p>Pair this pane with your local broker to follow authorized test windows and review saved recordings.</p>
 <div class="setup-note">Open this pane with <code>npm run qa:open</code> from the workspace. The trusted local launcher pairs it without putting a secret in a link or chat.</div>
 <details><summary>Pair manually instead</summary><form id="pair-form"><label>Private one-time code<input id="code" type="password" autocomplete="off" required></label><button class="primary">Open workspace</button></form><p class="muted">Use the private browser-code file. Never share or screenshot the code.</p></details></section>
 <div id="workspace" hidden>
-<nav class="tabs" aria-label="Workspace"><button id="tab-live" aria-pressed="true">Live</button><button id="tab-recordings" aria-pressed="false">Recordings <span id="run-count">0</span></button><span id="service" class="service">Local broker</span></nav>
+<nav class="tabs" aria-label="Workspace"><button id="tab-live" aria-pressed="true">Live</button><button id="tab-windows" aria-pressed="false">Windows</button><button id="tab-recordings" aria-pressed="false">Recordings <span id="run-count">0</span></button><span id="service" class="service">Local broker</span></nav>
 <section id="live-surface">
+<div id="live-windows"></div><div id="live-results"></div>
+<div id="shared-session" hidden>
 <div class="page-heading"><div><h1>Shared session</h1></div><span id="connection" class="pill">Disconnected</span></div>
 <div class="status-strip"><div><span>Target</span><strong id="target-name">Target not selected</strong></div><div><span>Controller</span><strong id="owner">Observer only</strong></div><div><span>Recording</span><strong id="recording">Not recording</strong></div></div>
 <div class="live-grid">
-<section class="viewer-panel"><div class="screen live-screen"><img id="live" alt="Shared live target" hidden><div id="live-empty" class="empty"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8m-4-4v4"/></svg><h2>No shared frame</h2><p>Start on the main display, or discover another display or restricted window.<br>Native permissions and installs stay unchanged.</p></div><span id="stale" class="stale" hidden>STALE FRAME</span></div>
-<div class="viewer-footer"><span id="frame-age">Waiting for a shared frame</span><span>Selected display or restricted window</span></div>
+<section class="viewer-panel"><div id="shared-viewer"><div id="live-viewer"><div id="live-screen" class="screen live-screen"><img id="live" alt="Live capture" hidden><canvas id="live-canvas" role="img" aria-label="Live capture" hidden></canvas><div id="live-empty" class="empty"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8m-4-4v4"/></svg><h2 id="live-empty-title">Waiting for an authorized window</h2><p id="live-empty-detail">When a scoped recording starts, its window appears automatically.</p><button id="watch-display" hidden>Watch shared display</button></div><span id="input-marker" class="input-marker" aria-hidden="true" hidden>➤</span><span id="stale" class="stale" hidden>STALE FRAME</span></div>
+<p id="input-cue" class="input-cue" hidden></p>
+<div class="viewer-footer"><span id="frame-age">Waiting for a shared frame</span><span id="live-mode" role="status"></span></div></div></div>
 <div class="current-check"><span class="eyebrow">CURRENT CHECK</span><h2 id="current-check">Ready when you are</h2><p id="check-result">Visual outcomes are caller-assessed. Counter checks use native state.</p></div></section>
-<aside class="control-panel">
+<aside id="shared-controls" class="control-panel">
 <h2>Run controls</h2><p id="control-hint" class="muted"></p>
 <div id="run-setup">
-<label>Run title<input id="run-title" value="Desktop interaction checks" maxlength="160"></label>
+<label>QA test description<input id="run-title" placeholder="Defaults to context or first named check" maxlength="160"></label>
 </div><div class="row"><button id="start" class="primary grow">Start QA</button><button id="finish">Finish</button></div>
-<details class="target-details"><summary>Target selection</summary><div class="row"><select id="targets" aria-label="Target"><option value="">Desktop · Main display (default)</option></select><button id="discover">Discover</button></div><p class="muted">Default: the main display, across all visible apps. Explicit application allowlists permit restricted windows only.</p></details>
+<details class="target-details" open><summary>Target selection</summary><div class="row"><select id="targets" aria-label="Target"><option value="">Choose an authorized target</option></select><button id="discover">Discover</button></div><p class="muted">Choose an authorized window. Sharing a whole display requires selecting it explicitly.</p></details>
 <div class="divider"></div><div class="row"><button id="take" class="grow">Take control</button><button id="release">Release</button></div>
 <details id="human-tools" open><summary>Sample controls · RelayMac counter only</summary><div class="observed"><span>Observed count</span><strong id="count">—</strong><small id="observation-state">Observe before input</small></div>
 <div class="row"><button id="observe" class="grow">Observe</button><button id="act" class="grow">Increment</button></div>
@@ -30,8 +33,25 @@
 <div class="row"><label class="grow">Expected count<input id="expected" type="number" value="1" min="0" max="1000000000"></label><button id="check" class="primary check-button">Check</button></div>
 <details><summary>Check context</summary><textarea id="context" maxlength="600" placeholder="Describe intent, including any deliberate mismatch."></textarea></details>
 <p class="fine">These count controls are RelayMac-only. Generic mouse and visual checks use the shared QA API. Input is never automatically retried.</p></details>
-</aside></div></section>
+</aside></div></div></section>
+<div id="windows-tab"><section id="windows-surface" hidden>
+<div class="page-heading"><div><h1 id="windows-title" tabindex="-1">Window sessions</h1><p class="muted">Only authorized test windows are shown. Watching does not take control.</p></div></div>
+<section id="window-watch" class="window-watch" aria-labelledby="watch-title" hidden>
+<div class="window-watch-heading"><button id="watch-back">Back to overview</button><span class="pill">Observer only</span></div>
+<h2 id="watch-title" tabindex="-1"></h2><p id="watch-target" class="muted"></p><p id="watch-check" class="muted"></p>
+<p id="watch-status" class="muted" role="status" hidden></p><button id="watch-recording" hidden>Open recording</button>
+<div id="window-viewer"></div>
+</section>
+<p id="windows-status" class="windows-status muted" role="status"></p>
+<div id="window-cards" class="window-cards" aria-label="Active window sessions"></div>
+</section></div>
 <section id="recordings-surface" hidden>
+<div id="recording-live" class="page-heading recording-live" hidden><span id="recording-live-status" role="status"></span><button id="resume-live">Watch live</button></div>
+<div id="recording-group"></div>
+<section id="follow-results" class="follow-results" aria-labelledby="follow-title" hidden>
+<div class="page-heading"><div><h1 id="follow-title" tabindex="-1">Finished recordings</h1><p id="follow-counts" class="muted"></p></div><button id="all-recordings" hidden>All recordings</button></div>
+<ul id="follow-cards" class="follow-cards"></ul>
+</section>
 <div id="library"><div class="page-heading"><div><h1>Recordings</h1></div><button id="refresh">Refresh</button></div>
 <p id="storage-usage" class="fine" role="status">Storage usage loading…</p>
 <div id="recordings-empty" class="empty recordings-empty"><h2>No recordings yet</h2><p>Start a run from Live or ask your agent to run QA.<br>Completed and interrupted runs stay here, even offline.</p></div>

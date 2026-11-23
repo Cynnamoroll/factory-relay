@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { ReplayEntry } from '../web/replay-entry.js';
 import { qaClipAt, qaEditPlan, QA_EDIT_VERSION } from '../web/qa-edit.js';
+import * as liveVideo from '../web/live-video.js';
+import * as cursorModel from '../web/action-cues.js';
+import { isDesktop, targetIdentity, targetLabel, sameTarget } from '../web/target-identity.js';
+import { recordingFilename } from '../web/recording-name.js';
 
 const runId = '8797e68a6d26b3ee679e28611c8454ee';
 const failureId = '0f536356251f5f6b03c837c4408cbed7';
@@ -31,24 +35,27 @@ class Element extends EventTarget {
   }
   setAttribute(key, value) { this.attributes[key] = value; }
   removeAttribute(key) { delete this.attributes[key]; if (key === 'src') this.src = ''; }
-  append(...children) { this.children.push(...children); }
+  append(...children) { for (const child of children) { child.remove(); child.parent = this; this.children.push(child); } }
+  remove() { if (this.parent) { this.parent.children = this.parent.children.filter(child => child !== this); this.parent = null; } }
   replaceChildren(...children) { this.children = children; }
   add(child) { this.append(child); }
   focus() {}
   setPointerCapture() {}
-  getBoundingClientRect() { return { left: 0, width: 1000 }; }
+  getContext() { return { drawImage() {}, clearRect() {} }; }
+  getBoundingClientRect() { return { left: 0, width: 1000, height: 700 }; }
   showModal() { this.open = true; }
   close() { this.open = false; this.dispatchEvent(new Event('close')); }
   querySelectorAll(tag) { return this.children.flatMap(c => [c, ...c.querySelectorAll(tag)]).filter(c => c.tagName === tag.toUpperCase()); }
   click() { if (!this.disabled) { this.dispatchEvent(new Event('click')); this.onclick?.(); } }
 }
 
-async function workspace({ rejectPlay = false, storedMode = null, exportStatus = 'ready', replay, results, runs, deletion, clipboard, unpaired = false } = {}) {
+async function workspace({ rejectPlay = false, storedMode = null, exportStatus = 'ready', replay, results, runs, deletion, clipboard, unpaired = false, codecs = {}, live, windowApi, sharedStatus, hash } = {}) {
   const html = fs.readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
   const elements = new Map([...html.matchAll(/<(\w+)[^>]*\bid="([^"]+)"[^>]*>/g)].map(([text, tag, id]) => {
     const element = new Element(tag); element.hidden = /\bhidden\b/.test(text); return [id, element];
   }));
   const $ = id => { assert.ok(elements.has(id), `Real HTML must contain #${id}`); return elements.get(id); };
+  if (live) $('live-canvas').getContext = () => ({ drawImage: live.draw, clearRect() {} });
   $('filter').value = 'all'; $('filter').options = ['all', 'fail', 'pass', 'blocked'].map(value => ({ value }));
   $('speed').value = '1';
   const video = $('video');
@@ -60,7 +67,7 @@ async function workspace({ rejectPlay = false, storedMode = null, exportStatus =
       this.paused = false; this.dispatchEvent(new Event('play'));
     } });
   const window = new EventTarget(), document = new EventTarget(), timers = [], requests = [], storageReads = [];
-  const location = { pathname: '/', hash: `#run=${runId}&step=${failureId}` };
+  const location = { pathname: '/', hash: hash ?? (live || windowApi || sharedStatus ? '' : `#run=${runId}&step=${failureId}`) };
   window.scrollTo = () => {};
   window.history = { replaceState: (_state, _title, url) => { location.hash = url.slice(url.indexOf('#')); } };
   Object.assign(document, { getElementById: $, createElement: tag => new Element(tag),
@@ -68,17 +75,23 @@ async function workspace({ rejectPlay = false, storedMode = null, exportStatus =
   for (const element of elements.values()) element.focus = () => { document.activeElement = element; };
   const response = data => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => data });
   let currentExport = exportStatus;
-  const context = vm.createContext({ ReplayEntry, qaClipAt, qaEditPlan, QA_EDIT_VERSION,
+  const context = vm.createContext({ ReplayEntry, qaClipAt, qaEditPlan, QA_EDIT_VERSION, recordingFilename, isDesktop, targetIdentity, targetLabel, sameTarget, ...liveVideo, ...cursorModel, ...codecs,
     document, window, location, URLSearchParams, URL,
     sessionStorage: { getItem: key => { storageReads.push(key); return storedMode; } },
-    performance, AbortSignal, console, Option: class extends Element {}, navigator: { clipboard },
+    performance: live?.clock ?? performance, AbortController, AbortSignal, console, Option: class extends Element {}, navigator: { clipboard },
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout() {}, setInterval() {},
     fetch: async (url, options) => {
       const input = options.body ? JSON.parse(options.body) : null; requests.push({ url, input });
       if (url === '/api/session') return unpaired
         ? { ...response({ error: 'authentication_required' }), ok: false } : response({ csrf: 'test-only' });
       if (url === '/session') { unpaired = false; return response({ csrf: 'test-only' }); }
-      if (url === '/api/status') return response({ windows: [], connection: 'disconnected', owner: null });
+      if (url === '/api/status') return response(sharedStatus ? sharedStatus() : { windows: [], connection: live ? 'live' : 'disconnected',
+        owner: null, ...(live ? { runId, target: { windowId: 99, pid: 800, bundleId: 'fixture.shared' } } : {}) });
+      if (url === '/api/live/stream' && live) return { ok: true,
+        body: typeof live.stream === 'function' ? live.stream(options.headers['X-QA-Live-Run']) : live.stream,
+        headers: new Headers(live.unbound ? {} : { 'X-QA-Live-Run': options.headers['X-QA-Live-Run'] }) };
+      if (url.startsWith('/api/window-overview') && windowApi) return windowApi(url, options, response);
+      if (url === '/api/window-overview') return response({ sessions: [] });
       if (url === '/api/recordings') return response(runs ? await runs() : { total: 0, runs: [] });
       if (/\/api\/recordings\/.*\/(confirm-delete|delete)$/.test(url)) return response(deletion ? await deletion(url, input)
         : { runId, title: recording.title, confirmation: 'test-consent' });
@@ -97,10 +110,10 @@ async function workspace({ rejectPlay = false, storedMode = null, exportStatus =
     } });
   const app = fs.readFileSync(new URL('../web/app.js', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '');
   vm.runInContext(app, context); await settle();
-  return { $, video, document, requests, storageReads, hasElement: id => elements.has(id),
+  return { $, video, document, requests, storageReads, context, hasElement: id => elements.has(id),
     metadata() { video.readyState = 4; video.dispatchEvent(new Event('loadedmetadata')); },
     async navigate(step) { location.hash = `#run=${runId}&step=${step}`; window.dispatchEvent(new Event('hashchange')); await settle(); },
-    async poll() { const timer = timers.findLast(t => t.ms === 2000); assert.ok(timer); await timer.fn(); await settle(); },
+    async poll(ms = 2000) { const timer = timers.findLast(t => t.ms === ms); assert.ok(timer); await timer.fn(); await settle(); },
     readyExport() { currentExport = 'ready'; } };
 }
 
@@ -127,6 +140,14 @@ test('real app entry converts persisted milliseconds, selects failure, and start
   assert.equal(w.$('selected-actual').textContent, 3);
   assert.ok(Math.abs(parseFloat(w.$('segments').children[1].style.left) - 37.136101028) < 0.000001);
   assert.equal(w.$('time').textContent, '0:03 / 0:08');
+});
+
+test('review download attributes use descriptive names and distinguish QA video from full session', async () => {
+  const w = await workspace({ replay: async () => ({ ...recording, title: 'Nimbus Studio - Menu opens',
+    sourceExport: { status: 'ready' }, selected: failed }) });
+  assert.equal(w.$('review-title').textContent, 'Nimbus Studio - Menu opens');
+  assert.equal(w.$('download').download, `Nimbus Studio - Menu opens - QA recording - ${runId}.mp4`);
+  assert.equal(w.$('source-download').download, `Nimbus Studio - Menu opens - full-session recording - ${runId}.mp4`);
 });
 
 test('video surface and overlay each toggle once; polling preserves user pause and seek', async () => {
@@ -261,7 +282,7 @@ test('QA-only media ignores stale mode preferences and plays edited intervals at
   const w = await workspace({ storedMode: 'full' }); w.metadata(); await settle(); w.video.pause();
   assert.equal(w.hasElement('review-mode'), false);
   assert.deepEqual(w.storageReads, []);
-  assert.equal(w.video.src, `/api/runs/${runId}/qa-v3-recording.mp4#export=3-0`);
+  assert.equal(w.video.src, `/api/runs/${runId}/qa-v4-recording.mp4#export=4-0`);
   assert.equal(w.$('download').href, w.video.src);
   assert.equal(w.video.currentTime.toFixed(9), '3.014580055');
   assert.equal(w.video.playbackRate, 1);
@@ -295,13 +316,13 @@ test('obsolete ready media cannot play; a newly published generation reloads at 
   version = QA_EDIT_VERSION; generation++;
   await w.navigate(failureId); w.metadata(); await settle();
   assert.equal(w.video.hidden, false);
-  assert.match(w.video.src, /qa-v3-recording.mp4#export=3-1$/);
+  assert.match(w.video.src, /qa-v4-recording.mp4#export=4-1$/);
   w.video.currentTime = 12;
   generation++; await w.navigate(failureId);
   assert.equal(w.video.readyState, 0, 'New media publication must not retain the loaded previous generation');
   w.metadata(); await settle();
   assert.equal(w.video.currentTime, recording.edit.clips[1].startMs / 1000);
-  assert.match(w.video.src, /#export=3-2$/);
+  assert.match(w.video.src, /#export=4-2$/);
 });
 
 test('a check without a QA clip stays inspectable but never seeks or starts unrelated footage', async () => {
@@ -328,7 +349,7 @@ test('recording rows preserve long titles and expose only recorded outcomes', as
   assert.equal(w.$('review-outcome').textContent, '1 passed · 1 failed');
   assert.ok(!row.querySelectorAll('span').some(element => /^(FAIL|FAILED)$/.test(element.textContent)));
   assert.equal(row.querySelectorAll('h3')[0].textContent, title);
-  assert.equal(row.querySelectorAll('img')[0].src, `/api/runs/${runId}/qa-v3-poster.jpg`);
+  assert.equal(row.querySelectorAll('img')[0].src, `/api/runs/${runId}/qa-v4-poster.jpg`);
   const outcomes = row.querySelectorAll('p')[0].children.map(c => c.textContent);
   assert.deepEqual(outcomes, ['1 passed', '1 failed']);
   assert.equal(w.$('recordings-empty').hidden, true);
@@ -528,4 +549,502 @@ test('active and exporting row deletion is disabled with a visible explanation',
   assert.match(buttons[0].title, /Finish recording/);
   assert.match(buttons[1].title, /queued \/ encoding/);
   assert.equal(w.requests.filter(r => r.url.endsWith('/confirm-delete')).length, 0);
+});
+
+const start = [0, 0, 0, 1];
+const key = new Uint8Array([...start, 0x67, 0x64, 0x00, 0x28, 0xac, 0xd9, 0x40, 0x78, ...start, 0x68, 0xee, 0x3c, 0x80,
+  ...start, 0x65, 0x88, 0x84, 0x21, 0xa0]);
+const delta = new Uint8Array([...start, 0x41, 0x9a, 0x22, 0x11]);
+
+test('a decoder backlog drop skips dependent deltas until the next keyframe', async () => {
+  const decoded = [];
+  let queue = 0;
+  class VideoDecoder {
+    constructor() { this.state = 'unconfigured'; }
+    configure() { this.state = 'configured'; }
+    get decodeQueueSize() { return queue; }
+    decode(chunk) { decoded.push(chunk.type + ':' + chunk.timestamp); }
+    close() { this.state = 'closed'; }
+  }
+  class EncodedVideoChunk { constructor({ type, timestamp }) { Object.assign(this, { type, timestamp }); } }
+  const w = await workspace({ codecs: { VideoDecoder, EncodedVideoChunk } });
+  const send = (keyframe, t, backlog = 0) => { queue = backlog; w.context.handleVideo({ keyframe, captureTimeSeconds: t }, keyframe ? key : delta); };
+  send(true, 1); send(false, 2);
+  send(false, 3, 5);
+  send(false, 4); send(false, 5);
+  send(true, 6, 5);
+  send(false, 7);
+  assert.deepEqual(decoded, ['key:1000000', 'delta:2000000', 'key:6000000', 'delta:7000000'],
+    'After a dropped delta, later deltas wait for a keyframe, and a keyframe is never dropped');
+});
+
+async function livePresentation() {
+  const ticks = new Map(), timers = new Map(), drawn = [], frames = [];
+  let now = 0, nextTick = 0, activeId = runId;
+  const senders = new Map();
+  const stream = id => new ReadableStream({ start: controller => { senders.set(id, controller); } });
+  class VideoFrame {
+    constructor(id) { Object.assign(this, { id, displayWidth: 640, displayHeight: 480, closed: 0 }); }
+    close() { this.closed++; }
+  }
+  class VideoDecoder {
+    constructor({ output }) { this.output = output; this.state = 'unconfigured'; this.decodeQueueSize = 0; }
+    configure() { this.state = 'configured'; }
+    decode(chunk) { const frame = new VideoFrame(chunk.timestamp / 1e6); frames.push(frame); this.output(frame); }
+    close() { this.state = 'closed'; }
+  }
+  const w = await workspace({ live: { stream, clock: { now: () => now }, draw: frame => drawn.push(frame.id) },
+    sharedStatus: () => ({ windows: [], connection: 'live', owner: null, runId: activeId,
+      target: { windowId: activeId === runId ? 99 : 123, pid: 800, bundleId: 'fixture.shared' } }), codecs: {
+    Image: class { async decode() {} }, Blob, TextDecoder, Uint8Array, VideoDecoder, webCodecsVideo: () => true,
+    EncodedVideoChunk: class { constructor({ timestamp }) { this.timestamp = timestamp; } },
+    requestAnimationFrame: fn => { ticks.set(++nextTick, fn); return nextTick; },
+    cancelAnimationFrame: id => ticks.delete(id),
+  } });
+  w.context.setTimeout = (fn, ms) => { timers.set(++nextTick, { fn, due: now + ms }); return nextTick; };
+  w.context.clearTimeout = id => timers.delete(id);
+  function send(header, bytes) {
+    const json = Buffer.from(JSON.stringify({ ...header, bytes: bytes.length }));
+    const length = Buffer.alloc(4); length.writeUInt32BE(json.length);
+    senders.get(activeId).enqueue(Buffer.concat([length, json, Buffer.from(bytes)]));
+  }
+  return { ...w, drawn, frames, send, close: () => { for (const sender of senders.values()) sender.close(); },
+    async changeTarget() { activeId = 'a'.repeat(32); await w.poll(750); },
+    push(id) { send({ type: 'vframe', keyframe: id === 1, captureTimeSeconds: id }, id === 1 ? key : delta); },
+    clockAt(at) { now = at; },
+    pending() { return { ticks: ticks.size, timers: timers.size }; },
+    cursorTimers() { return [...timers.values()].filter(t => t.fn.name === 'clearCursor').length; },
+    async advanceTimers(at) {
+      await settle(); now = at;
+      for (const [id, { fn, due }] of Array.from(timers))
+        if (at >= due && timers.delete(id)) fn();
+      await settle();
+    },
+    async tick(at) {
+      await settle(); now = at;
+      for (const [id, fn] of Array.from(ticks)) if (ticks.delete(id)) fn(at);
+      await settle();
+    },
+  };
+}
+
+test('live synthetic cursor is run-scoped, labeled, letterboxed, bounded and cleared on hide or target change', async () => {
+  const w = await livePresentation();
+  const cue = { runId, actor: 'agent', operation: 'mouse', status: 'acknowledged',
+    startMs: 100, endMs: 1000, point: { x: .968, y: .926 }, geometry: { width: 1920, height: 1200 } };
+  const send = value => w.send({ type: 'cue', cue: value, sourceMs: 100 }, []);
+  send(cue); await settle();
+  assert.equal(w.$('input-cue').hidden, false);
+  assert.match(w.$('input-cue').textContent, /Synthetic.*agent.*native ACK, not assertion/);
+  assert.equal(w.$('input-marker').hidden, false);
+  assert.equal(w.$('input-marker').style.left, '968px');
+  assert.ok(Math.abs(parseFloat(w.$('input-marker').style.top) - 616.25) < .001);
+  assert.deepEqual(w.drawn, [], 'Metadata never modifies decoded capture pixels');
+  await w.advanceTimers(900);
+  assert.equal(w.$('input-marker').hidden, true);
+  assert.equal(w.pending().timers, 0, 'Expiry leaves no animation or expiry timer');
+  send({ ...cue, status: 'blocked', point: null }); await settle();
+  assert.equal(w.$('input-marker').hidden, true);
+  assert.match(w.$('input-cue').textContent, /blocked/);
+  send({ ...cue, runId: 'f'.repeat(32) }); await settle();
+  assert.equal(w.$('input-cue').hidden, true, 'A different run cannot appear in this lane');
+  send(cue); await settle();
+  w.document.hidden = true; w.document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(w.$('input-cue').hidden, true);
+  assert.equal(w.pending().timers, 0);
+  w.document.hidden = false; send(cue); await settle();
+  await w.changeTarget();
+  assert.equal(w.$('input-marker').hidden, true);
+  assert.equal(w.$('input-cue').hidden, true);
+  assert.equal(w.cursorTimers(), 0, 'Target changes cancel the cursor timer independently of status polling');
+  w.close();
+});
+
+test('a bounded decoded burst presents fresh frames in order across display ticks', async () => {
+  const w = await livePresentation();
+  for (const id of [1, 2, 3, 4]) w.push(id);
+  await w.tick(16);
+  assert.deepEqual(w.drawn, [2], 'Only the oldest excess frame is discarded; draw once on the first tick');
+  await w.tick(32);
+  await w.tick(48);
+  assert.deepEqual(w.drawn, [2, 3, 4], 'Preserve burst frames that still fit the latency budget');
+  w.push(5);
+  await w.tick(99);
+  assert.deepEqual(w.drawn, [2, 3, 4], 'Do not paint stale frames after a stalled display tick');
+  assert.deepEqual(w.frames.map(frame => frame.closed), [1, 1, 1, 1, 1]);
+  w.close();
+});
+
+test('a retained JPEG replaces an active video canvas after decode failure', async () => {
+  const w = await livePresentation();
+  w.push(1);
+  await w.tick(16);
+  assert.equal(w.$('live-canvas').hidden, false);
+  w.send({ type: 'frame', version: 2 }, [0xff, 0xd8, 0xff, 0xd9]);
+  await w.tick(32);
+  assert.equal(w.$('live').hidden, true, 'Video takes priority while healthy');
+  w.push(2);
+  w.send({ type: 'vframe', keyframe: true }, [42]);
+  await settle();
+  assert.equal(w.$('live').hidden, false, 'Latest JPEG appears without another packet or animation callback');
+  assert.equal(w.$('live-canvas').hidden, true);
+  assert.deepEqual(w.drawn, [1], 'A queued video frame cannot replace the fallback');
+  assert.deepEqual(w.frames.map(frame => frame.closed), [1, 1]);
+  URL.revokeObjectURL(w.$('live').src);
+  w.close();
+});
+
+test('a visible pane falls back to fresh rate-limited canvas draws and resumes FIFO when animation returns', async () => {
+  const w = await livePresentation();
+  for (const id of [1, 2, 3, 4]) w.push(id);
+  await w.advanceTimers(42);
+  assert.deepEqual(w.drawn, [4], 'An indefinitely paused rAF cannot leave a visible pane blank');
+  assert.deepEqual(w.pending(), { ticks: 1, timers: 0 });
+  w.clockAt(75); w.push(5); await settle();
+  assert.deepEqual(w.drawn, [4, 5], 'An overdue rAF must not require the timer event to draw fresh input');
+  w.clockAt(76); w.push(6); await settle();
+  assert.deepEqual(w.drawn, [4, 5], 'A burst cannot bypass the fallback rate limit');
+  assert.deepEqual(w.pending(), { ticks: 1, timers: 1 });
+  await w.tick(84); w.push(7); w.push(8);
+  await w.tick(100); await w.tick(116);
+  assert.deepEqual(w.drawn, [4, 5, 6, 7, 8], 'Recovery restores in-order animation-frame draws');
+  await w.advanceTimers(500);
+  assert.deepEqual(w.pending(), { ticks: 0, timers: 0 }, 'Media scheduling must stop when input stops');
+  assert.ok(w.frames.every(frame => frame.closed === 1));
+  assert.equal(w.context.window.qaLiveStats.fallbackCanvasDrawn, 2);
+  assert.equal(w.context.window.qaLiveStats.rafCanvasDrawn, 3);
+  assert.equal(w.context.window.qaLiveStats.compositorPaints, null, 'Canvas calls do not measure displayed paints');
+  w.close();
+});
+
+test('late watchdog ticks, hidden panes, and source teardown never draw stale frames', async () => {
+  const w = await livePresentation();
+  w.push(1);
+  await w.advanceTimers(100);
+  assert.deepEqual(w.drawn, [], 'A late watchdog cannot make an expired frame visible');
+  assert.equal(w.frames[0].closed, 1);
+  w.push(2); await settle();
+  assert.deepEqual(w.drawn, [2], 'Fresh decode recovers even when both scheduling callbacks were late');
+  w.clockAt(101); w.push(3); await settle();
+  w.document.hidden = true; w.document.dispatchEvent(new Event('visibilitychange'));
+  w.push(4); await w.advanceTimers(200);
+  assert.deepEqual(w.pending(), { ticks: 0, timers: 0 });
+  assert.deepEqual(w.drawn, [2]);
+  w.document.hidden = false; w.document.dispatchEvent(new Event('visibilitychange'));
+  w.push(5); await settle();
+  assert.deepEqual(w.pending(), { ticks: 1, timers: 1 });
+  await w.changeTarget();
+  await w.tick(225);
+  assert.deepEqual(w.drawn, [2], 'A callback for the former target must not draw its queued frame');
+  assert.equal(w.$('live-canvas').hidden, true);
+  // The new source starts with a keyframe and must not inherit the previous watchdog deadline.
+  w.send({ type: 'vframe', keyframe: true, captureTimeSeconds: 6 }, key);
+  await w.advanceTimers(266);
+  assert.deepEqual(w.drawn, [2]);
+  await w.advanceTimers(267);
+  assert.deepEqual(w.drawn, [2, 6]);
+  assert.ok(w.frames.every(frame => frame.closed === 1));
+  w.close();
+});
+
+const lane = (id, title, windowId) => ({ runId: id, title, target: { windowId, pid: 20, bundleId: 'test.app' },
+  connection: 'live', owner: 'agent', frameVersion: 1, frameAgeMs: 100, currentCheck: { title: 'Check visible', status: 'pass' } });
+const overviewApi = '/api/window-overview';
+
+test('window overview lists parallel sessions, watches only the selected run, and opens ended recordings', async () => {
+  const first = lane('1'.repeat(32), 'First window', 1), second = lane(runId, 'Second window', 2);
+  const third = lane('3'.repeat(32), 'Third window', 3), fourth = lane('4'.repeat(32), 'Fourth window', 4);
+  let sessions = [], resolveFirst, abortedFirst, lateRead;
+  const w = await workspace({ windowApi: (url, options, response) => {
+    if (url === overviewApi) return response({ sessions });
+    if (url.endsWith('/frame')) return new Response(new Blob(['fixture']), { headers: { 'content-type': 'image/jpeg' } });
+    if (url === `${overviewApi}/${first.runId}/stream`) {
+      abortedFirst = options.signal;
+      return new Promise(resolve => { resolveFirst = resolve; });
+    }
+    if (url === `${overviewApi}/${second.runId}/stream`) return {
+      ok: true, body: new ReadableStream({ start(controller) { lateRead = controller; } }),
+    };
+    throw Error(`Unexpected window request: ${url}`);
+  } });
+  assert.equal(w.$('live-surface').hidden, false, 'The default shared controls remain the initial view');
+  w.$('tab-windows').click(); await settle();
+  assert.match(w.$('windows-status').textContent, /No active window sessions/);
+  assert.equal(w.$('live-surface').hidden, true);
+  sessions = [first]; await w.poll(1000);
+  assert.match(w.$('windows-status').textContent, /1 active window session ·/);
+  sessions = [first, second, third, fourth]; await w.poll(1000);
+  const buttons = () => w.$('window-cards').querySelectorAll('button');
+  assert.equal(buttons().length, 4);
+  assert.equal(w.$('window-cards').querySelectorAll('img').filter(img => !img.hidden).length, 4);
+  assert.ok(!w.requests.some(r => r.url.endsWith('/stream')), 'The overview has no streaming requests');
+  buttons()[0].click(); await settle();
+  assert.equal(w.$('watch-title').textContent, first.title);
+  buttons()[1].click(); await settle();
+  assert.equal(abortedFirst.aborted, true);
+  assert.equal(w.$('watch-title').textContent, second.title);
+  assert.equal(buttons()[1].attributes['aria-pressed'], 'true');
+  assert.ok(lateRead);
+  let abandoned = false;
+  resolveFirst({ ok: true, body: new ReadableStream({ cancel() { abandoned = true; } }) }); await settle();
+  assert.equal(abandoned, true, 'A late response from the old selection is never read');
+  assert.equal(w.$('watch-title').textContent, second.title);
+  assert.ok(!w.requests.some(r => r.input), 'Watching, switching, and polling did not send any task');
+  sessions = [first, third, fourth]; await w.poll(1000);
+  assert.equal(buttons().length, 3);
+  assert.match(w.$('watch-status').textContent, /no longer active/);
+  assert.equal(w.$('window-viewer').hidden, true);
+  assert.equal(w.$('watch-recording').hidden, false);
+  w.$('watch-recording').click(); await settle();
+  assert.equal(w.$('recordings-surface').hidden, false);
+  assert.equal(w.requests.find(r => r.url.endsWith('qa_replay')).input.runId, second.runId);
+  await settle();
+});
+
+test('in-flight JPEG decode is discarded on window switch and a disappeared run cannot reopen', async () => {
+  const first = lane('1'.repeat(32), 'First window', 1), second = lane('2'.repeat(32), 'Second window', 2);
+  let resolveDecode, sessions = [];
+  const w = await workspace({ codecs: { Blob, TextDecoder, Uint8Array, Image: class {
+    decode() { return new Promise(resolve => { resolveDecode = resolve; }); }
+  }, requestAnimationFrame: fn => setImmediate(fn) }, windowApi: (url, _options, response) => {
+    if (url === overviewApi) return response({ sessions });
+    if (url.endsWith('/frame')) return { ok: false, status: 404 };
+    if (url.includes(second.runId)) return { ok: false, status: 404 };
+    const header = Buffer.from(JSON.stringify({ type: 'frame', bytes: 1 }));
+    const len = Buffer.alloc(4); len.writeUInt32BE(header.length);
+    return { ok: true, body: new ReadableStream({ start(controller) { controller.enqueue(Buffer.concat([len, header, Buffer.from([0])])); } }) };
+  } });
+  sessions = [first, second]; w.$('tab-windows').click(); await settle();
+  const buttons = w.$('window-cards').querySelectorAll('button');
+  buttons[0].click(); await settle();
+  assert.equal(typeof resolveDecode, 'function');
+  buttons[1].click(); await settle();
+  resolveDecode(); await settle();
+  assert.equal(w.$('live').hidden, true);
+  assert.equal(w.$('live').src, '');
+  assert.match(w.$('watch-status').textContent, /stream not ready/);
+  sessions = [first];
+  await w.poll(1000);
+  assert.match(w.$('watch-status').textContent, /no longer active/);
+  assert.equal(w.requests.filter(r => r.url === `${overviewApi}/${second.runId}/stream`).length, 1);
+  w.$('tab-live').click(); await settle();
+  assert.equal(w.$('live-surface').hidden, false);
+  assert.equal(w.$('tab-windows').attributes['aria-pressed'], 'false');
+});
+
+test('an ended window and a closed overview cannot receive late thumbnails or status', async () => {
+  const first = lane('1'.repeat(32), 'First window', 1);
+  let sessions = [], thumbnail, delayedOverview;
+  const w = await workspace({ windowApi: (url, _options, response) => {
+    if (url === overviewApi) return sessions === null
+      ? new Promise(resolve => { delayedOverview = resolve; }) : response({ sessions });
+    return new Promise(resolve => { thumbnail = resolve; });
+  } });
+  sessions = [first]; w.$('tab-windows').click(); await settle();
+  const image = w.$('window-cards').querySelectorAll('img')[0];
+  sessions = []; await w.poll(1000);
+  thumbnail(new Response(new Blob(['fixture']), { headers: { 'content-type': 'image/jpeg' } })); await settle();
+  assert.equal(image.hidden, true);
+  assert.equal(w.$('window-cards').children.length, 0);
+  sessions = null;
+  const oldPoll = w.poll(1000); await settle();
+  sessions = []; w.$('tab-live').click(); await settle();
+  w.$('tab-windows').click(); await settle();
+  delayedOverview(Response.json({ sessions: [first] })); await oldPoll;
+  assert.match(w.$('windows-status').textContent, /No active window sessions/);
+  assert.equal(w.$('window-cards').children.length, 0);
+});
+
+const finishedLane = (lane, status, stepId) => ({ ...lane, status,
+  counts: { pass: 0, fail: 0, blocked: 0, uncertain: 0, [status]: 1 },
+  edit: { clips: stepId ? [{ status, stepId }] : [] }, export: { status: 'queued' } });
+
+test('Live follows four scoped windows through partial results and confirms group completion before review', async () => {
+  const a = lane('1'.repeat(32), 'First', 1), b = lane('2'.repeat(32), 'Second', 2),
+    c = lane('3'.repeat(32), 'Third', 3), d = lane('4'.repeat(32), 'Fourth', 4);
+  let sessions = [a, b, c, d], saved = [];
+  const w = await workspace({
+    windowApi: (url, _options, response) => {
+      if (url === overviewApi) return sessions ? response({ sessions }) : { ok: false, status: 503 };
+      if (url.endsWith('/frame')) return new Response(new Blob(['fixture']), { headers: { 'content-type': 'image/jpeg' } });
+      return { ok: true, body: new ReadableStream() };
+    },
+    runs: () => ({ total: saved.length, runs: saved }),
+  });
+  const shown = () => w.$('tab-live').attributes['aria-pressed'] === 'true';
+  const streams = () => w.requests.filter(r => r.url.endsWith('/stream')).map(r => r.url);
+  assert.ok(shown());
+  assert.equal(w.$('shared-session').hidden, true);
+  assert.equal(w.$('watch-title').textContent, 'First');
+  assert.equal(streams().length, 1);
+  assert.equal(w.requests.filter(r => r.url.endsWith('/frame')).length, 3);
+  sessions = [b, c, d]; saved = [finishedLane(a, 'fail', failureId)]; await w.poll(1000);
+  assert.ok(shown());
+  assert.equal(w.$('watch-title').textContent, 'Second');
+  assert.match(w.$('follow-counts').textContent, /^1 recording .*1 failed/);
+  sessions = [d]; saved.push(finishedLane(b, 'pass'), finishedLane(c, 'blocked')); await w.poll(1000);
+  assert.ok(shown());
+  assert.equal(w.$('watch-title').textContent, 'Fourth');
+  assert.equal(w.$('follow-cards').children.length, 3);
+  sessions = []; await w.poll(1000);
+  assert.ok(shown(), 'An empty active list does not prove a durable finish');
+  assert.match(w.$('windows-status').textContent, /Waiting to confirm/);
+  saved.push(finishedLane(d, 'uncertain')); await w.poll(1000);
+  assert.ok(shown(), 'A fresh empty snapshot must be confirmed');
+  sessions = null; await w.poll(1000);
+  sessions = []; await w.poll(1000);
+  assert.ok(shown(), 'A transient overview error resets completion confirmation');
+  await w.poll(1000);
+  assert.equal(w.$('tab-recordings').attributes['aria-pressed'], 'true');
+  assert.equal(w.$('follow-title').textContent, 'QA results');
+  assert.match(w.$('follow-counts').textContent, /1 passed · 1 failed · 1 blocked · 1 uncertain/);
+  assert.deepEqual(streams(), [a, b, d].map(s => `${overviewApi}/${s.runId}/stream`));
+  assert.ok(!w.requests.some(r => r.input), 'Automatic following only reads');
+  w.$('follow-cards').querySelectorAll('button')[0].click(); await settle();
+  assert.deepEqual(w.requests.find(r => r.url.endsWith('qa_replay')).input, {
+    runId: a.runId, stepId: failureId, filter: 'checks', limit: 100,
+  });
+});
+
+test('paired Live distinguishes display recording context from its unchanged window-only preview and input', async () => {
+  const first = { ...lane(runId, 'Window', 1), recordingScope: { scope: 'display', reason: 'sole_window_session' } };
+  let sessions = [first];
+  const w = await workspace({ windowApi: (url, _options, response) => url === overviewApi
+    ? response({ sessions }) : { ok: true, body: new ReadableStream() } });
+  assert.match(w.$('watch-target').textContent, /Recording: whole selected display/);
+  assert.match(w.$('watch-target').textContent, /preview and input: selected window/);
+  assert.equal(w.requests.filter(r => r.url.endsWith('/stream'))[0].url, `${overviewApi}/${runId}/stream`);
+  sessions = [{ ...first, recordingScope: { scope: 'window', reason: 'multiple_sessions' } }, lane('2'.repeat(32), 'Second', 2)];
+  await w.poll(1000);
+  assert.match(w.$('watch-target').textContent, /Recording: selected window \(multiple sessions\)/);
+  sessions = [{ ...first, recordingScope: { scope: 'window', reason: 'screen_recording_required' } }];
+  await w.poll(1000);
+  assert.match(w.$('watch-target').textContent, /screen recording required/);
+  assert.ok(!w.requests.some(r => r.input), 'Scope changes never send input, retarget or request desktop preview');
+});
+
+test('a single scoped window opens immediately, then opens only its matching recording on final completion', async () => {
+  const first = lane(runId, 'Only window', 1);
+  let sessions = [first], saved = [];
+  const w = await workspace({
+    runs: () => ({ total: saved.length, runs: saved }),
+    windowApi: (url, _options, response) => url === overviewApi ? response({ sessions })
+      : { ok: true, body: new ReadableStream() },
+  });
+  assert.equal(w.$('watch-title').textContent, first.title);
+  assert.equal(w.$('window-cards').querySelectorAll('button')[0].hidden, true);
+  assert.equal(w.$('tab-live').attributes['aria-pressed'], 'true');
+  sessions = []; saved = [finishedLane(first, 'fail', failureId)]; await w.poll(1000); await w.poll(1000);
+  assert.equal(w.$('review-title').textContent, recording.title);
+  assert.equal(w.context.location.hash, '', 'Automatic review does not become a manual deep link on reload');
+  assert.equal(w.requests.find(r => r.url.endsWith('qa_replay')).input.runId, first.runId);
+  const next = lane('2'.repeat(32), 'Next window', 2);
+  sessions = [next]; await w.poll(1000);
+  assert.equal(w.$('tab-live').attributes['aria-pressed'], 'true', 'Automatic review keeps following future recordings');
+  assert.equal(w.$('watch-title').textContent, next.title);
+  assert.equal(w.$('follow-results').hidden, true, 'A new recording does not inherit the previous group');
+  assert.ok(w.requests.some(r => r.url === `${overviewApi}/${next.runId}/stream`));
+});
+
+test('manual recording deep links take priority over automatic Live following', async () => {
+  const first = lane('1'.repeat(32), 'First', 1);
+  const w = await workspace({ hash: `#run=${runId}&step=${failureId}`,
+    windowApi: (_url, _options, response) => response({ sessions: [first] }),
+  });
+  assert.equal(w.$('tab-recordings').attributes['aria-pressed'], 'true');
+  assert.equal(w.$('selected-title').textContent, failed.title);
+  assert.ok(!w.requests.some(r => r.url.endsWith('/stream')), 'Intentional review never opens a stream in the background');
+  assert.match(w.$('recording-live-status').textContent, /1 window recording is active/);
+  w.$('resume-live').click(); await settle();
+  assert.equal(w.$('tab-live').attributes['aria-pressed'], 'true');
+  assert.equal(w.$('watch-title').textContent, first.title);
+});
+
+test('a connecting window opens when live and retries a transient scoped stream outage', async () => {
+  const first = lane('1'.repeat(32), 'First', 1);
+  let sessions = [{ ...first, connection: 'connecting' }], attempts = 0;
+  const w = await workspace({
+    windowApi: (url, _options, response) => {
+      if (url === overviewApi) return response({ sessions });
+      if (url.endsWith('/frame')) return { status: 404 };
+      if (++attempts === 1) return { ok: false, status: 404 };
+      if (attempts === 2) return { ok: false, status: 503 };
+      return { ok: true, body: new ReadableStream() };
+    },
+  });
+  assert.equal(w.$('watch-title').textContent, first.title);
+  assert.equal(attempts, 0);
+  sessions = [first]; await w.poll(1000);
+  assert.equal(attempts, 1);
+  await w.poll(750);
+  assert.equal(attempts, 1, 'Do not retry 404 until the scoped roster reconfirms the run');
+  await w.poll(1000);
+  assert.equal(attempts, 2);
+  await w.poll(1000);
+  assert.equal(attempts, 3);
+  assert.equal(w.$('window-viewer').hidden, false);
+  sessions = []; await w.poll(1000); await w.poll(1000);
+  assert.equal(attempts, 3, 'A disappeared window cannot reopen a stream');
+});
+
+test('manually selecting Recordings during automatic review keeps it selected when another run starts', async () => {
+  const first = lane(runId, 'Only window', 1), second = lane('2'.repeat(32), 'New window', 2);
+  let sessions = [first], saved = [];
+  const w = await workspace({
+    runs: () => ({ total: saved.length, runs: saved }),
+    windowApi: (url, _options, response) => url === overviewApi ? response({ sessions })
+      : { ok: true, body: new ReadableStream() },
+  });
+  sessions = []; saved = [finishedLane(first, 'pass')]; await w.poll(1000); await w.poll(1000);
+  w.$('tab-recordings').click(); await settle();
+  sessions = [second]; await w.poll(1000);
+  assert.equal(w.$('tab-recordings').attributes['aria-pressed'], 'true');
+  assert.equal(w.$('recording-live').hidden, false);
+  assert.ok(!w.requests.some(r => r.url === `${overviewApi}/${second.runId}/stream`));
+});
+
+test('opening an intermediate result and returning to Live does not hide the final group review', async () => {
+  const a = lane(runId, 'First', 1), b = lane('2'.repeat(32), 'Second', 2);
+  let sessions = [a, b], saved = [];
+  const w = await workspace({
+    windowApi: (url, _options, response) => url === overviewApi ? response({ sessions })
+      : { ok: true, body: new ReadableStream() },
+    runs: () => ({ total: saved.length, runs: saved }),
+  });
+  sessions = [b]; saved = [finishedLane(a, 'fail', failureId)]; await w.poll(1000);
+  w.$('follow-cards').querySelectorAll('button')[0].click(); await settle();
+  assert.equal(w.$('review').hidden, false);
+  w.$('tab-live').click(); await settle();
+  assert.equal(w.$('watch-title').textContent, b.title);
+  sessions = []; saved.push(finishedLane(b, 'pass')); await w.poll(1000); await w.poll(1000);
+  assert.equal(w.$('review').hidden, true);
+  assert.equal(w.$('follow-results').hidden, false);
+  assert.equal(w.$('follow-title').textContent, 'QA results');
+});
+
+test('an available desktop is neither selected nor streamed without an explicit choice', async () => {
+  const desktop = { kind: 'desktop', displayId: 11, displayUUID: 'fixture-display' };
+  let status = { connection: 'live', runId, target: desktop, owner: 'agent', desktopAllowed: true,
+    windows: [], displays: [desktop] };
+  const w = await workspace({ sharedStatus: () => status });
+  assert.equal(w.$('watch-display').hidden, false);
+  assert.equal(w.$('shared-controls').hidden, true);
+  assert.equal(w.$('targets').value, '');
+  assert.ok(!w.requests.some(r => r.url.endsWith('/stream')));
+  w.$('watch-display').click(); await settle();
+  assert.equal(w.$('shared-controls').hidden, false);
+  assert.equal(w.requests.filter(r => r.url === '/api/live/stream').length, 1);
+  status = { ...status, runId: 'a'.repeat(32) }; await w.poll(750);
+  assert.equal(w.$('live-canvas').hidden, true, 'Explicit consent does not carry across runs');
+  assert.equal(w.requests.filter(r => r.url === '/api/live/stream').length, 1);
+});
+
+test('legacy shared window playback fails closed if the server does not acknowledge run binding', async () => {
+  let cancelled = false;
+  const w = await workspace({ live: { unbound: true, draw: () => assert.fail('Unbound video must not draw'),
+    stream: new ReadableStream({ cancel() { cancelled = true; } }) } });
+  assert.equal(w.$('shared-session').hidden, false);
+  assert.equal(w.$('live-canvas').hidden, true);
+  assert.match(w.$('live-mode').textContent, /bound to this run/);
+  assert.equal(cancelled, true);
 });

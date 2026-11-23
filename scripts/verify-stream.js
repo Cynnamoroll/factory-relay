@@ -104,6 +104,12 @@ async function capture(target, label, action) {
     await consumeHost(ownerConfig, { lease, target, signal: controller.signal }, async ({ header, image }) => {
       const at = performance.now();
       if (header.type === 'heartbeat') { result.heartbeats++; return; }
+      if (header.type === 'vframe') {
+        result.videoFrames = (result.videoFrames ?? 0) + 1;
+        result.videoBytes = (result.videoBytes ?? 0) + image.length;
+        if (header.keyframe) result.videoKeyframes = (result.videoKeyframes ?? 0) + 1;
+        return;
+      }
       assert.equal(header.type, 'frame', JSON.stringify(header));
       firstAt ??= at;
       assert.ok(result.frames.length < 500, 'Verification frame-count bound');
@@ -168,7 +174,7 @@ try {
     } : undefined);
     if (mode === 'takeover') assert.equal(evidence.runs[0].stop, 'stale_lease');
     evidence.afterFirst = await inspect();
-    assert.equal(evidence.afterFirst.hostProcesses, 0);
+    assert.ok(evidence.afterFirst.hostProcesses <= 1, 'At most one persistent host remains after a stream ends');
     assert.equal(evidence.afterFirst.rendezvousDirectories, 0);
     const relisted = await windows();
     assert.ok(relisted.some(w => w.windowId === windowId && w.pid === pid && w.bundleId === bundleId));
@@ -182,7 +188,7 @@ try {
     try {
       evidence.after = await inspect();
       if (evidence.before) assert.equal(evidence.before.helperSHA256, evidence.after.helperSHA256, 'The authorized helper binary must not change');
-      assert.equal(evidence.after.hostProcesses, 0);
+      assert.ok(evidence.after.hostProcesses <= 1, 'At most one persistent host remains after verification');
       assert.equal(evidence.after.rendezvousDirectories, 0);
     } catch (error) { evidence.errors.push('cleanup:' + error.message); process.exitCode = 1; }
     try { evidence.release = await run(ownerConfig, 'release', { lease }); }

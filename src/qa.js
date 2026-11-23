@@ -5,6 +5,13 @@ import { loadConfig } from './transport.js';
 import { RunStore } from './qa-store.js';
 import { Broker, nativeAdapter } from './qa-broker.js';
 import { createQAServer } from './qa-server.js';
+import { WindowSessions } from './qa-window-sessions.js';
+import { autoOpenWindowPane } from './qa-pane.js';
+import { closeSessions } from './mac-session.js';
+
+const reportCleanupError = error => {
+  console.error(/^[a-z_]{1,64}$/.test(error.message) ? error.message : 'session_cleanup_unconfirmed');
+};
 
 let broker, service;
 try {
@@ -19,7 +26,9 @@ try {
     throw new Error('unsafe_credentials');
   const adapter = nativeAdapter(config);
   broker = new Broker(new RunStore(root + 'runs'), adapter);
-  service = createQAServer(broker);
+  service = createQAServer(broker, { windowSessions: new WindowSessions(broker, () => nativeAdapter(config),
+    { onCleanupError: reportCleanupError }),
+    onWindowRun: autoOpenWindowPane(root + 'agent.json') });
   const origin = await service.listen(port);
   // Credentials live outside journals and are replaced only by this workspace launcher.
   for (const [name, body] of [
@@ -34,19 +43,26 @@ try {
     }
     fs.writeFileSync(file, body, { mode: 0o600 });
   }
-  console.log(`factory-relay: ${origin}\nRun npm run qa:open to open and privately pair Factory's embedded browser pane. No Mac action occurs until you start QA.`);
+  console.log(`factory-relay: ${origin}\nThe first window run opens the assigned Factory pane. To pair manually, run npm run qa:open. No Mac action occurs until you start QA.`);
   let closing = false;
   const close = async () => {
     if (closing) return;
     closing = true;
-    await service.close();
-    await broker.close();
+    try { await service.close(); }
+    finally { try { await broker.close(); } finally { await closeSessions(); } }
   };
-  process.once('SIGINT', () => { close().catch(() => { process.exitCode = 1; }); });
-  process.once('SIGTERM', () => { close().catch(() => { process.exitCode = 1; }); });
+  const onSignal = () => {
+    close().catch(error => {
+      reportCleanupError(error);
+      process.exitCode = 1;
+    });
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
 } catch (e) {
   console.error(/^[a-z_]+$/.test(e.message) ? e.message : 'qa_start_failed');
-  if (service) await service.close();
-  if (broker) await broker.close();
+  if (service) await service.close().catch(() => {});
+  if (broker) await broker.close().catch(() => {});
+  await closeSessions();
   process.exitCode = 1;
 }

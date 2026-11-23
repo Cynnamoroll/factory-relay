@@ -7,6 +7,7 @@ enum ControlError: String, Error {
     case targetMismatch = "target_mismatch", stale = "observation_stale"
     case unavailable = "element_unavailable", uncertain = "action_uncertain"
     case timeout = "control_timeout", disconnected = "control_closed"
+    case screenRecording = "screen_recording_required", backgroundUnavailable = "background_unavailable"
 }
 
 struct ControlTarget: Codable, Equatable {
@@ -127,16 +128,14 @@ struct MouseCommand: Decodable {
     let deltaY: Int?
 }
 
-// The watchdog must release a held button even when the IPC peer disappears.
+// A held button is always released, including when the requesting connection disappears mid-gesture.
 final class MouseRelease: @unchecked Sendable {
     static let shared = MouseRelease()
     private let lock = NSLock()
     private var held: CGEvent?
-    private var cancelled = false
     func down(_ point: CGPoint, _ button: CGMouseButton, count: Int64 = 1) throws {
         lock.lock()
         defer { lock.unlock() }
-        guard !cancelled else { throw ControlError.disconnected }
         guard let event = CGEvent(mouseEventSource: nil,
             mouseType: button == .left ? .leftMouseDown : .rightMouseDown,
             mouseCursorPosition: point, mouseButton: button),
@@ -150,87 +149,17 @@ final class MouseRelease: @unchecked Sendable {
     func post(_ event: CGEvent, at point: CGPoint) throws {
         lock.lock()
         defer { lock.unlock() }
-        guard !cancelled else { throw ControlError.disconnected }
         held?.location = point
         event.post(tap: .cghidEventTap)
     }
-    func release(count: Int64 = 1, cancel: Bool = false) {
+    func release(count: Int64 = 1) {
         lock.lock()
         defer { lock.unlock() }
-        if cancel { cancelled = true }
         guard let event = held else { return }
         event.setIntegerValueField(.mouseEventClickState, value: count)
         event.post(tap: .cghidEventTap)
         held = nil
     }
-}
-
-func controlWriteJSON(_ value: [String: Any]) throws {
-    let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) + Data([10])
-    guard data.count <= 16384 else { throw ControlError.invalidRequest }
-    try data.withUnsafeBytes { bytes in
-        var offset = 0
-        while offset < bytes.count {
-            let count = Darwin.write(STDOUT_FILENO, bytes.baseAddress!.advanced(by: offset), bytes.count - offset)
-            guard count > 0 else { throw ControlError.disconnected }
-            offset += count
-        }
-    }
-}
-
-func controlConnect(_ path: String) throws {
-    let url = URL(fileURLWithPath: path)
-    let directory = url.deletingLastPathComponent()
-    let root = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".applets-control")
-    guard url.lastPathComponent == "io", directory.deletingLastPathComponent().path == root.path,
-          directory.lastPathComponent.hasPrefix("c-"), path.utf8.count < 104 else {
-        throw ControlError.invalidRequest
-    }
-    for (item, kind, mode) in [(root.path, S_IFDIR, 0o700),
-                               (directory.path, S_IFDIR, 0o700), (path, S_IFSOCK, 0o600)] {
-        var info = stat()
-        guard lstat(item, &info) == 0, info.st_uid == geteuid(),
-              info.st_mode & S_IFMT == kind, info.st_mode & 0o777 == mode else {
-            throw ControlError.invalidRequest
-        }
-    }
-    let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-    guard fd >= 0 else { throw ControlError.disconnected }
-    defer { close(fd) }
-    var address = sockaddr_un()
-    address.sun_family = sa_family_t(AF_UNIX)
-    address.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
-    withUnsafeMutableBytes(of: &address.sun_path) { destination in
-        path.utf8CString.withUnsafeBytes { destination.copyBytes(from: $0) }
-    }
-    let connected = withUnsafePointer(to: &address) {
-        $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-            Darwin.connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
-        }
-    }
-    var uid: uid_t = 0
-    var gid: gid_t = 0
-    guard connected == 0, getpeereid(fd, &uid, &gid) == 0, uid == geteuid(),
-          dup2(fd, STDIN_FILENO) >= 0, dup2(fd, STDOUT_FILENO) >= 0 else {
-        throw ControlError.disconnected
-    }
-    try controlWriteJSON(["protocol": 1, "type": "hello", "pid": getpid()])
-}
-
-func controlReadRequest() throws -> ControlRequest {
-    var data = Data()
-    let end = ProcessInfo.processInfo.systemUptime + 10
-    while data.count <= 16384 && ProcessInfo.processInfo.systemUptime < end {
-        var item = pollfd(fd: STDIN_FILENO, events: Int16(POLLIN), revents: 0)
-        guard poll(&item, 1, 100) >= 0 else { throw ControlError.disconnected }
-        if item.revents & Int16(POLLIN) != 0 {
-            var byte: UInt8 = 0
-            guard Darwin.read(STDIN_FILENO, &byte, 1) == 1 else { throw ControlError.disconnected }
-            if byte == 10 { return try JSONDecoder().decode(ControlRequest.self, from: data) }
-            data.append(byte)
-        } else if item.revents & Int16(POLLHUP | POLLERR) != 0 { throw ControlError.disconnected }
-    }
-    throw ControlError.timeout
 }
 
 @MainActor
@@ -325,8 +254,26 @@ enum Control {
                          elements: elements.sorted { $0.id < $1.id }), button)
     }
 
-    static func mouse(_ command: MouseCommand, expected: ControlSnapshot) throws {
+    static func prepareAccessibility(_ expected: ControlSnapshot, alive: () -> Bool) throws {
+        guard !expected.target.isDesktop, let pid = expected.target.pid else { return }
+        let application = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(application, 0.15)
+        // Web-backed apps may withhold their control tree until assistive technology requests it.
+        // This is process-local, not a permission prompt, profile change, or input action.
+        guard let enabled = attribute(application, "AXManualAccessibility") as? Bool, !enabled else { return }
+        var settable: DarwinBoolean = false
+        guard AXUIElementIsAttributeSettable(application, "AXManualAccessibility" as CFString, &settable) == .success,
+              settable.boolValue else { return }
+        let current = try identitySnapshot(expected.target)
+        guard current.processStartedAt == expected.processStartedAt,
+              current.windowRectPoints == expected.windowRectPoints, alive() else { throw ControlError.stale }
+        _ = AXUIElementSetAttributeValue(application, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+    }
+
+    /// Foreground HID input for a whole display. Callers reach this only under an exclusive desktop lease.
+    static func mouse(_ command: MouseCommand, expected: ControlSnapshot, alive: () -> Bool) throws {
         let coordinate: (Double) -> Bool = { $0.isFinite && $0 >= 0 && $0 < 1 }
+        guard expected.target.isDesktop else { throw ControlError.backgroundUnavailable }
         guard coordinate(command.x), coordinate(command.y),
               ["move", "click", "drag", "scroll"].contains(command.kind) else { throw ControlError.invalidRequest }
         switch command.kind {
@@ -344,45 +291,21 @@ enum Control {
         guard r.count == 4 else { throw ControlError.stale }
         func point(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: r[0] + x * r[2], y: r[1] + y * r[3]) }
         let until = ProcessInfo.processInfo.systemUptime + 1.8
-        let system = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(system, 0.1)
         func validate(_ point: CGPoint) throws {
             let current = try identitySnapshot(expected.target)
-            guard current.windowRectPoints == expected.windowRectPoints,
-                  current.processStartedAt == expected.processStartedAt,
-                  current.displayConfiguration == expected.displayConfiguration,
+            guard current.displayConfiguration == expected.displayConfiguration,
                   ProcessInfo.processInfo.systemUptime < until else { throw ControlError.stale }
             var displays = [CGDirectDisplayID](repeating: 0, count: 32)
             var displayCount: UInt32 = 0
             guard CGGetActiveDisplayList(32, &displays, &displayCount) == .success,
                   displays.prefix(Int(displayCount)).contains(where: { CGDisplayBounds($0).contains(point) })
                 else { throw ControlError.targetMismatch }
-            var byte: UInt8 = 0
-            let count = recv(STDIN_FILENO, &byte, 1, MSG_PEEK | MSG_DONTWAIT)
-            guard count != 0, count >= 0 || errno == EAGAIN || errno == EINTR else { throw ControlError.disconnected }
-            if expected.target.isDesktop {
-                guard CGPreflightScreenCaptureAccess(), CGPreflightPostEventAccess(),
-                      let session = CGSessionCopyCurrentDictionary() as? [String: Any],
-                      session[kCGSessionOnConsoleKey as String] as? Bool == true,
-                      session[kCGSessionLoginDoneKey as String] as? Bool == true,
-                      CGRect(x: r[0], y: r[1], width: r[2], height: r[3]).contains(point) else { throw ControlError.inaccessible }
-                return
-            }
-            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == expected.target.pid else { throw ControlError.stale }
-            guard let rows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]],
-                  let top = rows.first(where: { row in
-                      guard (row[kCGWindowAlpha as String] as? Double ?? 1) > 0,
-                            let bounds = row[kCGWindowBounds as String] as? NSDictionary,
-                            let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return false }
-                      return rect.contains(point)
-                  }),
-                  top[kCGWindowNumber as String] as? UInt32 == expected.target.windowId,
-                  top[kCGWindowOwnerPID as String] as? Int32 == expected.target.pid else { throw ControlError.targetMismatch }
-            var hit: AXUIElement?
-            var hitPID: pid_t = 0
-            guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &hit) == .success,
-                  let hit, AXUIElementGetPid(hit, &hitPID) == .success,
-                  hitPID == expected.target.pid else { throw ControlError.targetMismatch }
+            guard alive() else { throw ControlError.disconnected }
+            guard CGPreflightScreenCaptureAccess(), CGPreflightPostEventAccess(),
+                  let session = CGSessionCopyCurrentDictionary() as? [String: Any],
+                  session[kCGSessionOnConsoleKey as String] as? Bool == true,
+                  session[kCGSessionLoginDoneKey as String] as? Bool == true,
+                  CGRect(x: r[0], y: r[1], width: r[2], height: r[3]).contains(point) else { throw ControlError.inaccessible }
         }
         let start = point(command.x, command.y)
         try validate(start)
@@ -432,7 +355,7 @@ enum Control {
         }
     }
 
-    static func perform(_ request: ControlRequest) throws -> [String: Any] {
+    static func perform(_ request: ControlRequest, alive: () -> Bool) throws -> [String: Any] {
         guard ["diagnose", "observe", "press", "mouse"].contains(request.operation) else { throw ControlError.invalidRequest }
         if request.operation == "diagnose" {
             guard request.target == nil, request.expected == nil, request.elementId == nil,
@@ -441,7 +364,7 @@ enum Control {
                     "bundlePath": Bundle.main.bundlePath, "executablePath": Bundle.main.executablePath ?? "",
                     "accessibility": AXIsProcessTrusted(), "screenRecording": CGPreflightScreenCaptureAccess(),
                     "permissionRequested": false,
-                    "launchMode": "launchservices-ipc", "processId": getpid(), "parentProcessId": getppid(),
+                    "launchMode": "persistent-ipc", "processId": getpid(), "parentProcessId": getppid(),
                     "lifecycle": HostLifecycle.diagnostics]
         }
         guard AXIsProcessTrusted() else { throw ControlError.inaccessible }
@@ -458,11 +381,19 @@ enum Control {
             guard expected.windowRectPoints == identity.windowRectPoints,
                   expected.processStartedAt == identity.processStartedAt,
                   expected.displayConfiguration == identity.displayConfiguration else { throw ControlError.stale }
-            try mouse(command, expected: expected)
-            return ["type": "mouse-acknowledged"]
+            if target.isDesktop {
+                try mouse(command, expected: expected, alive: alive)
+                return ["type": "mouse-acknowledged", "route": "foreground-hid", "focusPreserved": false, "cursorPreserved": false]
+            }
+            return try backgroundClick(command, expected: expected, alive: alive)
         }
         let pair: (ControlSnapshot, AXUIElement?)
-        if request.mode == "pixels" { pair = (try identitySnapshot(target), nil) }
+        if request.mode == "pixels" {
+            guard request.expected == nil, request.elementId == nil, request.mouse == nil else { throw ControlError.invalidRequest }
+            let current = try identitySnapshot(target)
+            try prepareAccessibility(current, alive: alive)
+            pair = (current, nil)
+        }
         else { pair = try snapshot(target, until: until) }
         let (current, button) = pair
         if request.operation == "observe" {
@@ -476,34 +407,62 @@ enum Control {
               geometry(owningWindow as! AXUIElement)
                 == CGRect(x: current.rectPoints[0], y: current.rectPoints[1],
                           width: current.rectPoints[2], height: current.rectPoints[3]),
-              ProcessInfo.processInfo.systemUptime < until else { throw ControlError.stale }
+              ProcessInfo.processInfo.systemUptime < until, alive() else { throw ControlError.stale }
         // A messaging timeout can mean the action happened. Never retry an uncertain press.
         guard AXUIElementPerformAction(button, kAXPressAction as CFString) == .success else { throw ControlError.uncertain }
         return ["type": "pressed", "elementId": "relay-increment"]
     }
 
-    static func run() async {
-        let args = Array(CommandLine.arguments.dropFirst())
-        guard args.count == 2, args[0] == "control" else { return }
-        do {
-            try await Task.detached { try controlConnect(args[1]) }.value
-            let watchdog = DispatchSource.makeTimerSource(queue: .global())
-            let end = ProcessInfo.processInfo.systemUptime + 15
-            watchdog.schedule(deadline: .now(), repeating: .milliseconds(100))
-            watchdog.setEventHandler {
-                var byte: UInt8 = 0
-                let count = recv(STDIN_FILENO, &byte, 1, MSG_PEEK | MSG_DONTWAIT)
-                if count == 0 || (count < 0 && errno != EAGAIN && errno != EINTR)
-                    || ProcessInfo.processInfo.systemUptime > end {
-                    MouseRelease.shared.release(cancel: true)
-                    exit(0)
-                }
+    /// Silent window input: a left single click becomes AXPress on the pressable element under the point.
+    /// No event is posted, so focus, cursor and other windows are untouched. Anything that cannot be
+    /// expressed this way is refused with background_unavailable instead of falling back to HID.
+    static func backgroundClick(_ command: MouseCommand, expected: ControlSnapshot, alive: () -> Bool) throws -> [String: Any] {
+        guard command.kind == "click", command.button == "left", command.count == 1,
+              command.x.isFinite, command.y.isFinite, (0..<1).contains(command.x), (0..<1).contains(command.y)
+            else { throw ControlError.backgroundUnavailable }
+        let r = expected.rectPoints
+        guard r.count == 4, let pid = expected.target.pid else { throw ControlError.stale }
+        let windowRect = CGRect(x: r[0], y: r[1], width: r[2], height: r[3])
+        let point = CGPoint(x: r[0] + command.x * r[2], y: r[1] + command.y * r[3])
+        let application = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(application, 0.15)
+        guard let windows = attribute(application, kAXWindowsAttribute) as? [AXUIElement],
+              windows.count <= 32 else { throw ControlError.backgroundUnavailable }
+        let matches = windows.filter { geometry($0) == windowRect }
+        guard matches.count == 1 else { throw ControlError.backgroundUnavailable }
+        var hit: AXUIElement?
+        guard AXUIElementCopyElementAtPosition(application, Float(point.x), Float(point.y), &hit) == .success,
+              var element = hit else { throw ControlError.backgroundUnavailable }
+        var pressable: AXUIElement?
+        for _ in 0..<8 {
+            var hitPID: pid_t = 0
+            // A different owner means another window covers the point; never press through it.
+            guard AXUIElementGetPid(element, &hitPID) == .success, hitPID == pid else { throw ControlError.backgroundUnavailable }
+            var names: CFArray?
+            if AXUIElementCopyActionNames(element, &names) == .success,
+               let actions = names as? [String], actions.contains(kAXPressAction as String) {
+                pressable = element
+                break
             }
-            watchdog.resume()
-            defer { watchdog.cancel() }
-            let request = try await Task.detached { try controlReadRequest() }.value
-            do { try controlWriteJSON(["ok": true, "result": try perform(request)]) }
-            catch { try controlWriteJSON(["ok": false, "error": (error as? ControlError)?.rawValue ?? "invalid_request"]) }
-        } catch {}
+            guard let parent = attribute(element, kAXParentAttribute),
+                  CFGetTypeID(parent) == AXUIElementGetTypeID() else { break }
+            element = parent as! AXUIElement
+        }
+        guard let pressable, let owningWindow = attribute(pressable, kAXWindowAttribute),
+              CFGetTypeID(owningWindow) == AXUIElementGetTypeID(),
+              CFEqual(owningWindow, matches[0]),
+              geometry(owningWindow as! AXUIElement) == windowRect,
+              attribute(pressable, kAXEnabledAttribute) as? Bool == true,
+              let frame = geometry(pressable), frame.contains(point) else { throw ControlError.backgroundUnavailable }
+        let current = try identitySnapshot(expected.target)
+        guard current.windowRectPoints == expected.windowRectPoints,
+              current.processStartedAt == expected.processStartedAt, alive() else { throw ControlError.stale }
+        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        let cursor = CGEvent(source: nil)?.location
+        // A messaging timeout can mean the press happened. The supervisor fences and never retries.
+        guard AXUIElementPerformAction(pressable, kAXPressAction as CFString) == .success else { throw ControlError.uncertain }
+        return ["type": "mouse-acknowledged", "route": "background-ax-press",
+                "focusPreserved": NSWorkspace.shared.frontmostApplication?.processIdentifier == front,
+                "cursorPreserved": CGEvent(source: nil)?.location == cursor]
     }
 }

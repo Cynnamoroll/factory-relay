@@ -76,6 +76,40 @@ async function start(broker) {
 }
 const click = { kind: 'click', x: 0.25, y: 0.5, button: 'left', count: 1 };
 
+test('bare executable runs persist the exact discovered application name and adopt their first named QA check', async t => {
+  const { broker, store, state } = fixture(t);
+  state.windows[0].displayName = 'Nimbus Studio';
+  state.windows[0].title = 'Private document, not the application';
+  await broker.task('agent', 'qa_targets', {});
+  const { runId } = await broker.task('agent', 'qa_start', { target });
+  const original = JSON.stringify(store.get(runId).events[0]);
+  assert.equal((await broker.task('agent', 'qa_runs', {})).runs[0].title, 'Nimbus Studio - QA session');
+  const observed = await broker.task('agent', 'qa_observe', { runId });
+  await broker.task('agent', 'qa_check', { runId, kind: 'visual', title: 'Toolbar remains visible',
+    expected: 'Toolbar is visible', actual: 'Toolbar is visible', outcome: 'pass', observationId: observed.observationId });
+  const replay = await broker.task('agent', 'qa_replay', { runId });
+  assert.equal(replay.title, 'Nimbus Studio - Toolbar remains visible');
+  assert.equal(replay.applicationName, 'Nimbus Studio');
+  assert.equal(store.history()[0].labels.title, replay.title);
+  assert.equal(JSON.stringify(store.get(runId).events[0]), original);
+});
+
+test('explicit and contextual QA purposes remain authoritative through named checks', async t => {
+  for (const input of [{ title: 'Nimbus Studio - Open preferences' },
+    { context: 'Open preferences' + ' '.repeat(580) }]) {
+    const { broker, state } = fixture(t);
+    state.windows[0].displayName = 'Nimbus Studio';
+    await broker.task('agent', 'qa_targets', {});
+    const started = await broker.task('agent', 'qa_start', { target, ...input });
+    assert.equal(started.title, 'Nimbus Studio - Open preferences');
+    const observed = await broker.task('agent', 'qa_observe', { runId: started.runId });
+    await broker.task('agent', 'qa_check', { runId: started.runId, kind: 'visual', title: 'Different check',
+      expected: 'Visible', actual: 'Visible', outcome: 'pass', observationId: observed.observationId });
+    assert.equal((await broker.task('agent', 'qa_replay', { runId: started.runId })).title, started.title);
+    assert.equal((await broker.task('agent', 'qa_status', {})).title, started.title);
+  }
+});
+
 test('generic targets and typed mouse validate bare identities and exact bounded coordinates', () => {
   assert.deepEqual(controlTargetSchema.parse(target), target);
   const request = { operation: 'mouse', target, lease: { token: 'a'.repeat(64), generation: 1 },
@@ -255,7 +289,7 @@ test('real MCP exposes generic discovery, pixels, mouse, caller-assessed checks 
   assert.ok(report.edit.segments.some(s => s.role === 'preceding-input'), 'Mouse context remains conservatively associated');
   assert.ok(report.edit.segments.some(s => s.role === 'assessed-frame'), 'Assessed raw frame evidence is not replaced by later footage');
   assert.match(report.reportMarkdown, /not server-verified/);
-  const mp4 = report.artifacts['qa-v3-recording.mp4'];
+  const mp4 = report.artifacts['qa-v4-recording.mp4'];
   const probe = JSON.parse(await mediaProcess('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', mp4]));
   assert.ok(Number(probe.format.duration) > 0);
   const pixels = path.join(root, 'decoded.rgb');

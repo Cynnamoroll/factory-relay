@@ -39,7 +39,10 @@ export function capabilities(app) {
   return implemented(app)
     ? { sharedQA: true, observe: ['pixels', ...(app.bundleId === sampleBundle ? ['count'] : [])],
       act: ['mouse', ...(app.bundleId === sampleBundle ? ['increment'] : [])],
-      check: ['visual', ...(app.bundleId === sampleBundle ? ['count'] : [])], recording: true }
+      check: ['visual', ...(app.bundleId === sampleBundle ? ['count'] : [])], recording: true,
+      mouse: isDesktop(app)
+        ? { route: 'foreground-hid', lease: 'exclusive', kinds: ['move', 'click', 'drag', 'scroll'] }
+        : { route: 'background-ax-press', lease: 'window', kinds: ['click'], buttons: ['left'], counts: [1] } }
     : { sharedQA: false, reason: 'driver_not_implemented', observe: [], act: [], check: [], recording: false };
 }
 export function nativeAuthorized(applications, target) {
@@ -51,7 +54,7 @@ export function requireNativeAuthorization(applications, target) {
   if (!nativeAuthorized(applications, target)) throw new Error('application_not_authorized');
 }
 function resolve(applications, { applicationId, target }) {
-  if (isDesktop(target) || !target && applicationId === undefined && interactiveProfiles.has(applications)) {
+  if (isDesktop(target) || !target && applicationId === 'desktop' && interactiveProfiles.has(applications)) {
     if (!interactiveProfiles.has(applications)) throw new Error('application_not_authorized');
     if (applicationId !== undefined && applicationId !== 'desktop') throw new Error('application_mismatch');
     return { id: 'desktop', name: 'Desktop', platform: 'macos', kind: 'desktop' };

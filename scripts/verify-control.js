@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, quote, run } from '../src/transport.js';
 import { control } from '../src/control.js';
 import { consumeHost } from '../src/stream.js';
+import { appIconIcns } from './app-icon.js';
 
 
 const config = await loadConfig(process.argv[2]);
@@ -73,6 +74,7 @@ for (const name of ['AppletsHost.swift', 'HostLifecycle.swift', 'AppletsControl.
   hashes.host[name === 'Info.plist' ? 'Factory Relay.app/Contents/Info.plist' : name] =
     createHash('sha256').update(await readFile(new URL('../' + folder + '/' + name, import.meta.url))).digest('hex');
 }
+hashes.host['Factory Relay.app/Contents/Resources/AppIcon.icns'] = createHash('sha256').update(appIconIcns()).digest('hex');
 let owner = config, lease;
 const proof = ({ token, generation }) => ({ token, generation });
 async function audit() {
@@ -90,7 +92,7 @@ async function audit() {
     assert.equal(value[kind].signatureVerified, true);
     assert.equal(value[kind].sourcesMatch, true);
     assert.equal(value[kind].manifestMatches, true);
-    assert.equal(value[kind].processes, 0);
+    assert.ok(value[kind].processes <= 1, 'At most one persistent host serves every client');
   }
   assert.equal(value.stagingDirectories, 0);
   if (value.legacy) {
@@ -112,6 +114,7 @@ function stream(target, label) {
   const timer = setTimeout(() => controller.abort(), 90000);
   const done = consumeHost(owner, { lease, target, signal: controller.signal }, async ({ header, image }) => {
     if (header.type === 'heartbeat') { result.heartbeats++; return; }
+    if (header.type === 'vframe') { result.videoFrames = (result.videoFrames ?? 0) + 1; return; }
     assert.equal(header.type, 'frame');
     result.frames++;
     const hash = createHash('sha256').update(image).digest('hex');
@@ -152,7 +155,8 @@ try {
   lease = proof(await run(config, 'acquire', { ttlSeconds: 600 }));
   evidence.before = await audit();
   for (let i = 0; i < 2; i++) evidence.diagnostics.push(await control(config, { operation: 'diagnose', lease }));
-  assert.notEqual(evidence.diagnostics[0].processId, evidence.diagnostics[1].processId);
+  assert.equal(evidence.diagnostics[0].processId, evidence.diagnostics[1].processId, 'Warm calls reuse the persistent host');
+  assert.equal(evidence.diagnostics[0].launchMode, 'persistent-ipc');
   await consumeHost(config, { lease, mode: 'diagnose' }, ({ header }) => { evidence.captureDiagnostic = header; });
   for (const diagnostic of evidence.diagnostics) {
     assert.equal(diagnostic.bundleId, 'com.factory.applets.host');
