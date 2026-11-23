@@ -13,13 +13,13 @@ export const EXPORT_POLICY = Object.freeze({ maxBytes: 128 * MiB, totalBytes: 51
   timeoutMs: 120000, maxQueued: 4, gapAfterMs: 1000, width: 1280, height: 720 });
 const baseNames = ['state.json', 'state.tmp', 'recording.mp4', 'poster.jpg', 'gap.jpg', 'frames.ffconcat', 'checks.srt', 'summary.json', 'cursor.ass'];
 const names = new Set([...baseNames, ...baseNames.map(name => 'qa-' + name), ...baseNames.map(name => 'qa-v2-' + name),
-  ...baseNames.map(name => 'qa-v3-' + name), ...baseNames.map(name => 'qa-v4-' + name),
-  ...baseNames.map(name => 'source-v1-' + name), 'qa-v2-video.filter',
+  ...baseNames.map(name => 'qa-v3-' + name), ...baseNames.map(name => 'qa-v4-' + name), ...baseNames.map(name => 'qa-v5-' + name),
+  ...baseNames.map(name => 'source-v1-' + name), ...baseNames.map(name => 'source-v2-' + name), 'qa-v2-video.filter',
   ...['kicker', 'title', 'status', 'expected', 'actual', 'context', 'footer'].map(name => `qa-v2-card-${name}.txt`),
   ...Array.from({ length: QA_EDIT_POLICY.maxClips }, (_, i) => ['intro', 'result'].map(kind => `qa-v2-card-${i}-${kind}.jpg`)).flat()]);
 function variantName(name, variant) {
   if (!['source', 'qa'].includes(variant)) throw new Error('invalid_export_variant');
-  return (variant === 'qa' ? 'qa-v4-' : 'source-v1-') + name;
+  return (variant === 'qa' ? 'qa-v5-' : 'source-v2-') + name;
 }
 const stateKey = (id, variant) => variant === 'qa' ? id + ':qa' : id;
 function privateStat(file, directory = false) {
@@ -113,13 +113,14 @@ export function humanRecordingSegments(events, durationMs, gapAfterMs = EXPORT_P
   }
   return result;
 }
-const subtitleTime = ms => new Date(Math.max(0, Math.floor(ms))).toISOString().slice(11, 23).replace('.', ',');
-const plain = text => String(text).replace(/[<>{}\r\n]/g, ' ').slice(0, 800);
 export function qaRecordingSegments(events, edit, gapAfterMs = EXPORT_POLICY.gapAfterMs) {
   const source = humanRecordingSegments(events, edit.sourceDurationMs, gapAfterMs);
   const frames = new Map(events.filter(e => ['frame', 'recording-frame'].includes(e.kind)).map(e => [e.frameId, e.receivedElapsedMs ?? e.elapsedMs]));
-  const result = [];
+  const result = [], byInterval = new Map();
   for (const interval of edit.segments) {
+    if (interval.kind === 'review-hold') continue;
+    const pieces = [];
+    byInterval.set(interval, pieces);
     for (const segment of source) {
       const start = Math.max(segment.startMs, interval.sourceStartMs), end = Math.min(segment.endMs, interval.sourceEndMs);
       if (end <= start) continue;
@@ -128,25 +129,27 @@ export function qaRecordingSegments(events, edit, gapAfterMs = EXPORT_POLICY.gap
         // Display context retains its bounded source-sample hold, not an assertion's window frame ID.
         (segment.recordingScope === 'display' || frameTime >= interval.sourceStartMs && frameTime < interval.sourceEndMs ||
           segment.frameId === interval.beforeFrameId);
-      result.push({ startMs: interval.startMs + start - interval.sourceStartMs, endMs: interval.startMs + end - interval.sourceStartMs,
+      const packet = { startMs: interval.startMs + start - interval.sourceStartMs, endMs: interval.startMs + end - interval.sourceStartMs,
         sourceStartMs: start, sourceEndMs: end, stepId: interval.stepId, role: interval.role,
         ...(included ? { kind: 'frame', frameId: segment.frameId, receivedSourceMs: frameTime, recordingScope: segment.recordingScope ?? 'window' }
-          : { kind: 'gap', reason: 'No recorded footage inside this evidence interval' }) });
+          : { kind: 'gap', reason: 'No recorded footage inside this evidence interval' }) };
+      result.push(packet); pieces.push(packet);
       if (result.length > QA_EDIT_POLICY.maxSegments) throw new Error('qa_segment_limit');
     }
   }
-  return result;
-}
-function subtitles(run, duration) {
-  const entries = run.events.filter(e => (e.kind === 'step-start' && e.operation === 'assert-count') || e.kind === 'assertion');
-  return entries.map((e, i) => {
-    const end = Math.min(duration, entries[i + 1]?.elapsedMs ?? duration);
-    if (end <= e.elapsedMs) return '';
-    const caption = e.kind === 'assertion'
-      ? `${e.title ?? 'Count check'} | ${e.status.toUpperCase()} | expected ${e.expected}, observed ${e.actual ?? 'unavailable'}`
-      : `Checking: ${e.title ?? 'Count check'}`;
-    return `${i + 1}\n${subtitleTime(e.elapsedMs)} --> ${subtitleTime(end)}\n${plain(caption)}\n`;
-  }).filter(Boolean).join('\n') || '1\n00:00:00,000 --> 00:00:00,001\n \n';
+  return edit.segments.flatMap(interval => {
+    // Keep interval identity; recomparing floating-point endpoints can drop packets.
+    if (interval.kind !== 'review-hold') return byInterval.get(interval);
+    const evidence = result.filter(s => s.stepId === interval.stepId);
+    const assessed = interval.frameId && frames.has(interval.frameId) ? {
+      kind: 'frame', frameId: interval.frameId, receivedSourceMs: frames.get(interval.frameId), recordingScope: 'window',
+    } : null;
+    const held = interval.role === 'check-opening' ? evidence[0] : assessed ?? evidence.at(-1);
+    return [{ ...(held ?? { kind: 'gap', reason: 'No recorded frame available to review' }),
+      startMs: interval.startMs, endMs: interval.endMs, stepId: interval.stepId, role: interval.role,
+      sourceStartMs: undefined, sourceEndMs: undefined, reviewHold: true,
+      review: interval }];
+  });
 }
 export class Exporter {
   constructor(store, policy = EXPORT_POLICY) {
@@ -165,7 +168,7 @@ export class Exporter {
       }
       for (const variant of ['source', 'qa']) {
         const stateFile = path.join(dir, variantName('state.json', variant));
-        if (!fs.readdirSync(dir).some(name => name.startsWith(variant === 'qa' ? 'qa-v4-' : 'source-v1-'))) continue;
+        if (!fs.readdirSync(dir).some(name => name.startsWith(variant === 'qa' ? 'qa-v5-' : 'source-v2-'))) continue;
         let state = { status: 'encoding' };
         if (fs.existsSync(stateFile)) {
           if (privateStat(stateFile).size > 8192) throw new Error('unsafe_export_storage');
@@ -295,7 +298,6 @@ export class Exporter {
     }
     put(file('gap.jpg'), '');
     await mediaProcess('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=0x101318:s=1280x720',
-      '-vf', "drawtext=text='NO RECORDED FOOTAGE':fontcolor=white:fontsize=34:x=(w-text_w)/2:y=(h-text_h)/2",
       '-frames:v', '1', '-threads', '2', file('gap.jpg')], { signal });
     const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
     const manifest = ['ffconcat version 1.0'];
@@ -311,12 +313,10 @@ export class Exporter {
     }
     manifest.push(`file ${quote(file('gap.jpg'))}`, 'option framerate 1000');
     put(file('frames.ffconcat'), manifest.join('\n') + '\n');
-    if (!edit) put(file('checks.srt'), subtitles(r, durationMs));
     put(file('recording.mp4'), '');
     const start = performance.now();
     const filter = 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=0x101318,setsar=1'
-      + `,subtitles=${variantName('cursor.ass', variant)}`
-      + (edit ? '' : `,drawtext=text='Sampled capture - elapsed time preserved - gaps marked':fontcolor=white:fontsize=16:box=1:boxcolor=black@0.7:x=16:y=16,subtitles=${variantName('checks.srt', variant)}`);
+      + (presentation.ass.includes('Dialogue:') ? `,subtitles=${variantName('cursor.ass', variant)}` : '');
     await mediaProcess('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-threads', '2', '-filter_threads', '2',
       '-f', 'concat', '-safe', '0', '-i', variantName('frames.ffconcat', variant), '-an',
       '-vf', filter,
@@ -332,7 +332,7 @@ export class Exporter {
     if (!Number.isFinite(duration) || !Number.isSafeInteger(Number(probe.format.size)) || Number(probe.format.size) <= 0 ||
         Math.abs(duration * 1000 - durationMs) > 100 || Number(probe.format.size) >= this.policy.maxBytes)
       throw new Error('export_duration_or_size_mismatch');
-    const posterPacket = packets.find(s => s.kind === 'frame' && presentation.cues.some(c =>
+    const posterPacket = packets.find(s => !s.reviewHold && s.kind === 'frame' && presentation.cues.some(c =>
       c.startMs <= (s.sourceStartMs ?? s.startMs) && (s.sourceStartMs ?? s.startMs) < c.endMs)) ?? packets.find(s => s.kind === 'frame');
     put(file('poster.jpg'), '');
     await mediaProcess('ffmpeg', ['-v', 'error', '-y', '-i', file('recording.mp4'),
@@ -344,7 +344,7 @@ export class Exporter {
         receivedElapsedMs: e.receivedElapsedMs, recordedElapsedMs: e.elapsedMs })),
       cursor: { version: CURSOR_VERSION, synthetic: true, interpolation: 'Visualization, not captured physical movement',
         acknowledgement: 'Native ACK is not an assertion', cues: presentation.cues }, encoding: {
-      codec: 'H.264', timing: edit ? 'Footage-only evidence intervals retain receive-clock time; missing footage is marked' : 'variable presentation timestamps from monotonic broker receive elapsed time',
+      codec: 'H.264', timing: edit ? 'Review holds are separate from receive-clock evidence; missing footage remains blank' : 'variable presentation timestamps from monotonic broker receive elapsed time',
       gapAfterMs: this.policy.gapAfterMs, sourceCadence: '5 Hz background sampling plus action evidence; only actually received frames',
       measuredEncodeMs: Math.round(performance.now() - start), measuredDurationSeconds: duration,
     }, sourceFrames: r.events.filter(e => e.kind === 'frame').map(e => ({

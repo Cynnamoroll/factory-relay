@@ -121,14 +121,26 @@ test('a valid prior coordinate visibly interpolates, rather than inventing captu
   assert.equal(at.point.y, .926);
 });
 
+test('recording presentation contains only vector cursors, never text or legends', () => {
+  const events = trace();
+  const segment = { kind: 'frame', frameId: events.find(e => e.kind === 'frame').frameId,
+    startMs: 0, endMs: 200 };
+  const presentation = cursorPresentation(events, [segment], 200);
+  const drawings = presentation.ass.split('\n').filter(line => line.startsWith('Dialogue:'));
+  assert.ok(drawings.length > 0);
+  assert.ok(drawings.every(line => line.includes('\\p1}')), 'Every rendered event is a vector arrow');
+  assert.doesNotMatch(presentation.ass, /Synthetic input|native ACK|Review pause|Expected:|Observed:/);
+});
+
 test('read-only observations retain strict preceding-input context without changing assertion authority or time', () => {
   const events = trace(), plan = qaEditPlan(events, 200);
   assert.equal(plan.available, true, plan.reason);
-  assert.equal(plan.durationMs, 110);
-  assert.equal(plan.presentationMs, 0);
-  assert.equal(plan.segments[0].role, 'preceding-input');
-  assert.equal(sourceToQA(plan, 90), 60);
-  assert.equal(qaToSource(plan, 60), 90);
+  assert.equal(plan.evidenceMs, 110);
+  assert.equal(plan.durationMs, 8000);
+  assert.equal(plan.presentationMs, 7890);
+  assert.equal(plan.segments.find(s => s.kind === 'evidence').role, 'preceding-input');
+  assert.equal(sourceToQA(plan, 90), 2060);
+  assert.equal(qaToSource(plan, 2060), 90);
   for (const change of [
     rows => { rows[10].actor = 'human'; }, rows => { rows[10].snapshot.processStartedAt++; },
     rows => { rows[10].snapshot.windowRectPoints[0]++; },
@@ -178,8 +190,8 @@ test('downloaded short QA MP4 and poster contain independently decoded cursor pi
   exporter.request(run.id, false, 'qa');
   const state = await exporter.wait(run.id, 30000, 'qa');
   assert.equal(state.status, 'ready', JSON.stringify(state));
-  assert.equal(state.durationMs, 110);
-  const video = exporter.artifact(run.id, 'qa-v4-recording.mp4').file;
+  assert.ok(state.durationMs >= 8000);
+  const video = exporter.artifact(run.id, 'qa-v5-recording.mp4').file;
   const rgb = path.join(root, 'cursor.rgb');
   await mediaProcess('ffmpeg', ['-v', 'error', '-i', video, '-vf', 'fps=100,crop=50:50:1160:650',
     '-f', 'rawvideo', '-pix_fmt', 'rgb24', rgb]);
@@ -191,12 +203,12 @@ test('downloaded short QA MP4 and poster contain independently decoded cursor pi
   }
   assert.ok(cyan > 100, `Decoded short MP4 must visibly contain the cyan synthetic cursor, got ${cyan} pixels`);
   assert.equal(leftOfPointer, 0, 'Decoded video must leave UI pixels left of the plain arrow untouched, without click rings');
-  const poster = exporter.artifact(run.id, 'qa-v4-poster.jpg').file, posterRGB = path.join(root, 'poster.rgb');
+  const poster = exporter.artifact(run.id, 'qa-v5-poster.jpg').file, posterRGB = path.join(root, 'poster.rgb');
   await mediaProcess('ffmpeg', ['-v', 'error', '-i', poster, '-vf', 'crop=50:50:1160:650', '-f', 'rawvideo', '-pix_fmt', 'rgb24', posterRGB]);
   assert.ok(fs.readFileSync(posterRGB).some(n => n > 150), 'Poster must derive from marked presentation, not a raw JPEG');
   assert.deepEqual(hashes(), before);
   await exporter.close();
-  const statePath = path.join(exporter.root, run.id, 'qa-v4-state.json');
+  const statePath = path.join(exporter.root, run.id, 'qa-v5-state.json');
   const saved = JSON.parse(fs.readFileSync(statePath)); delete saved.cursorVersion;
   fs.writeFileSync(statePath, JSON.stringify(saved));
   const restarted = new Exporter(store); t.after(() => restarted.close());

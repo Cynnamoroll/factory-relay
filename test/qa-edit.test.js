@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { qaEditPlan, qaClipAt, sourceToQA, qaToSource, qaSegmentAt, QA_EDIT_VERSION, QA_EDIT_POLICY } from '../web/qa-edit.js';
+import { qaEditPlan as pacedPlan, qaClipAt, sourceToQA, qaToSource, qaSegmentAt, QA_EDIT_VERSION, QA_EDIT_POLICY } from '../web/qa-edit.js';
 import { RunStore } from '../src/qa-store.js';
 import { Exporter, mediaProcess, EXPORT_POLICY } from '../src/qa-export.js';
 import { Broker } from '../src/qa-broker.js';
@@ -14,6 +14,8 @@ const a = 'a'.repeat(32), b = 'b'.repeat(32), c = 'c'.repeat(32);
 const start = (stepId, elapsedMs, operation = 'assert-count') => ({ kind: 'step-start', operation, stepId, elapsedMs });
 const outcome = (stepId, elapsedMs, status = 'pass') => ({ kind: 'assertion', stepId, elapsedMs, status });
 const wrap = rows => [{ kind: 'run-start', elapsedMs: 0 }, ...rows, { kind: 'run-end', elapsedMs: 10000 }];
+// Isolate evidence selection/mapping here. Default pacing has its own regression suite.
+const qaEditPlan = (events, duration, policy = QA_EDIT_POLICY) => pacedPlan(events, duration, { ...policy, reviewPauses: false });
 const sample = wrap([start(a, 1000), outcome(a, 2000), start(b, 5000), outcome(b, 6500, 'fail'),
   start(c, 8000), outcome(c, 8500, 'blocked')]);
 
@@ -187,17 +189,26 @@ test('actual QA MP4 excludes distinct red setup/idle footage, preserves pass/fai
   assert.equal(broker.exports.state(run.id, 'qa').status, 'not_requested');
   const report = await broker.task('agent', 'qa_report', { runId: run.id, waitMs: 30000 });
   assert.equal(report.export.status, 'ready', JSON.stringify(report.export));
-  const qa = broker.exports.artifact(run.id, 'qa-v4-recording.mp4');
+  const qa = broker.exports.artifact(run.id, 'qa-v5-recording.mp4');
   const probe = JSON.parse(await mediaProcess('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', qa.file]));
   const seconds = Number(probe.format.duration);
-  assert.ok(Math.abs(seconds - 1.8) < .1, `Independent duration ${seconds} must equal 1.8 seconds of evidence with no presentation dwell`);
-  const evidence = JSON.parse(fs.readFileSync(broker.exports.artifact(run.id, 'qa-v4-summary.json').file));
+  assert.ok(seconds >= 16, `Independent duration ${seconds} must allow at least eight seconds per check`);
+  const evidence = JSON.parse(fs.readFileSync(broker.exports.artifact(run.id, 'qa-v5-summary.json').file));
+  assert.equal(evidence.edit.evidenceMs, 1800.333);
+  assert.ok(Math.abs(seconds * 1000 - evidence.edit.durationMs) < 100);
+  const native = JSON.parse(await mediaProcess('ffprobe', ['-v', 'error', '-show_entries',
+    'frame=pts_time,duration_time', '-of', 'json', qa.file])).frames;
+  const final = native.at(-1);
+  assert.ok(Math.abs(Number(final.pts_time) + Number(final.duration_time) - seconds) < .01,
+    'Actual decoded frame timestamps must end at the advertised presentation duration');
   assert.ok(evidence.segments.some(s => s.kind === 'gap' && s.sourceStartMs > 3290 && s.sourceEndMs < 3520));
   const pixels = path.join(root, 'decoded.rgb');
-  await mediaProcess('ffmpeg', ['-v', 'error', '-i', qa.file, '-vf', 'fps=40,crop=2:2:300:200,scale=1:1',
+  // The FPS resampler can extrapolate EOF after sparse frames. Native timestamps
+  // are checked above; sample only the media's independently probed duration.
+  await mediaProcess('ffmpeg', ['-v', 'error', '-i', qa.file, '-t', String(seconds), '-vf', 'fps=40,crop=2:2:300:200,scale=1:1',
     '-f', 'rawvideo', '-pix_fmt', 'rgb24', pixels]);
   const rgb = fs.readFileSync(pixels), samples = Array.from({ length: rgb.length / 3 }, (_, i) => [...rgb.subarray(i * 3, i * 3 + 3)]);
-  assert.equal(samples.length, 72, '1.8 seconds of footage decoded at 40 samples per second');
+  assert.ok(Math.abs(samples.length - seconds * 40) <= 1, `Review pauses: ${samples.length} decoded samples, expected ${seconds * 40} at 40 fps`);
   assert.ok(samples.every(([r, g, b]) => !(r > 150 && g < 60 && b < 60)), 'No decoded sample may contain excluded red setup/idle footage');
   const pixelAt = seconds => samples[Math.floor(seconds * 40)];
   const inputSegment = evidence.edit.segments.find(s => s.role === 'preceding-input');
@@ -209,34 +220,43 @@ test('actual QA MP4 excludes distinct red setup/idle footage, preserves pass/fai
   assert.ok(pixelAt((assertionSegments[0].startMs + 100) / 1000)[1] > 180, 'Passing green assertion evidence remains');
   assert.ok(pixelAt((assertionSegments[1].startMs + 100) / 1000)[2] > 180, 'Failing blue assertion evidence remains');
   assert.ok(pixelAt((assertionSegments[1].startMs + 400) / 1000).every(v => v < 50), 'The internal gap remains explicitly dark');
-  assert.ok(evidence.edit.segments.every(s => s.kind === 'evidence'), 'No intro or result intervals are added');
+  assert.equal(evidence.edit.segments.filter(s => s.kind === 'review-hold').length, 4, 'Each check has opening and result review pauses');
   assert.ok(evidence.segments.every(s => ['frame', 'gap'].includes(s.kind)), 'Only recorded frames and missing-footage gaps are encoded');
-  assert.ok(!fs.readdirSync(path.join(broker.exports.root, run.id)).some(name => /^qa-v4-.*(?:card|srt|filter)/.test(name)));
+  assert.ok(!fs.readdirSync(path.join(broker.exports.root, run.id)).some(name => /^qa-v5-.*(?:card|srt|filter)/.test(name)));
   const top = path.join(root, 'footage-top.rgb');
-  await mediaProcess('ffmpeg', ['-v', 'error', '-i', qa.file, '-frames:v', '1',
-    '-vf', "fps=40,select='eq(n,8)',crop=600:30:170:6", '-f', 'rawvideo', '-pix_fmt', 'rgb24', top]);
+  await mediaProcess('ffmpeg', ['-v', 'error', '-ss', String((inputSegment.startMs + 200) / 1000), '-i', qa.file, '-frames:v', '1',
+    '-vf', 'crop=600:30:170:6', '-f', 'rawvideo', '-pix_fmt', 'rgb24', top]);
   const topPixels = fs.readFileSync(top);
   assert.equal(topPixels.length, 600 * 30 * 3);
   for (let i = 0; i < topPixels.length; i += 3)
     assert.ok(topPixels[i] > 180 && topPixels[i + 1] > 180 && topPixels[i + 2] < 60, 'No caption obscures the yellow input footage');
+  for (const y of [6, 680]) {
+    const clean = path.join(root, `held-${y}.rgb`);
+    await mediaProcess('ffmpeg', ['-v', 'error', '-ss', '0.5', '-i', qa.file, '-frames:v', '1',
+      '-vf', `crop=600:30:170:${y}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', clean]);
+    const pixels = fs.readFileSync(clean);
+    for (let i = 0; i < pixels.length; i += 3)
+      assert.ok(pixels[i] > 180 && pixels[i + 1] > 180 && pixels[i + 2] < 60,
+        'Reading pauses retain clean image pixels, with no burned-in heading, result text or legend');
+  }
   assert.deepEqual(immutable.map(digest), before, 'QA derivation never rewrites source video, poster, summary, journal or JPEGs');
   assert.equal(report.sourceArtifact, sourceFiles[0]);
   service = createQAServer(broker);
   const origin = await service.listen(0), auth = { Authorization: 'Bearer ' + service.agentToken, 'X-QA-Request': '1' };
-  for (const name of ['qa-v4-recording.mp4', 'recording.mp4', 'qa-v4-poster.jpg', 'qa-v4-summary.json']) {
+  for (const name of ['qa-v5-recording.mp4', 'recording.mp4', 'qa-v5-poster.jpg', 'qa-v5-summary.json']) {
     const route = `${origin}/api/runs/${run.id}/${name}`;
     assert.equal((await fetch(route, { headers: { ...auth, Range: 'bytes=0-15' } })).status, 206);
     assert.equal((await fetch(route, { headers: { 'Sec-Fetch-Site': 'same-origin' } })).status, 401);
     assert.equal((await fetch(route, { headers: { ...auth, Origin: 'https://evil.test' } })).status, 403);
     assert.equal((await fetch(route, { headers: { ...auth, Range: 'bytes=999999999-' } })).status, 416);
   }
-  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v4-state.json`, { headers: auth })).status, 404);
+  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v5-state.json`, { headers: auth })).status, 404);
   const pair = await fetch(origin + '/session', { method: 'POST',
     headers: { Origin: origin, 'Content-Type': 'application/json', 'X-QA-Request': '1' }, body: JSON.stringify({ code: service.pairingCode }) });
-  const cookie = pair.headers.get('set-cookie').split(';')[0], route = `${origin}/api/runs/${run.id}/qa-v4-recording.mp4`;
+  const cookie = pair.headers.get('set-cookie').split(';')[0], route = `${origin}/api/runs/${run.id}/qa-v5-recording.mp4`;
   assert.equal((await fetch(route, { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'same-origin', Range: 'bytes=-16' } })).status, 206);
   assert.equal((await fetch(route, { headers: { Cookie: cookie, 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
-  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v4-card-0-result.jpg`, { headers: auth })).status, 404);
+  assert.equal((await fetch(`${origin}/api/runs/${run.id}/qa-v5-card-0-result.jpg`, { headers: auth })).status, 404);
   await broker.exports.close();
   const reopened = new Exporter(store);
   assert.equal(reopened.state(run.id).status, 'ready');
@@ -261,7 +281,7 @@ test('source and QA exports share one worker and one bounded queue; empty QA nev
   const state = await exporter.wait(run.id, 30000, 'qa');
   assert.equal(state.code, 'qa_no_completed_checks');
   assert.equal(exporter.state(run.id).status, 'not_requested');
-  assert.throws(() => exporter.artifact(run.id, 'qa-v4-recording.mp4'), /export_not_ready/);
+  assert.throws(() => exporter.artifact(run.id, 'qa-v5-recording.mp4'), /export_not_ready/);
   let active = 0;
   exporter.encode = async (_id, signal) => {
     assert.equal(++active, 1);
@@ -288,12 +308,12 @@ test('QA artifact names retain private-file checks, strict whitelist and combine
   const run = store.start({}, {}, 'agent'); store.finish(run, 'uncertain', 'safety fixture');
   exporter.save(run.id, { status: 'ready' }, 'qa');
   const directory = path.join(exporter.root, run.id);
-  fs.writeFileSync(path.join(directory, 'qa-v4-summary.json'), 'x'.repeat(4096), { mode: 0o600 });
+  fs.writeFileSync(path.join(directory, 'qa-v5-summary.json'), 'x'.repeat(4096), { mode: 0o600 });
   assert.ok(exporter.bytes() >= 4096);
   assert.throws(() => new Exporter(store, { ...EXPORT_POLICY, totalBytes: 1024 }), /export_storage_full/);
-  assert.throws(() => exporter.artifact(run.id, 'qa-v4-state.json'), /export_not_ready/);
-  assert.throws(() => exporter.artifact(run.id, '../qa-v4-summary.json'), /export_not_ready/);
-  fs.symlinkSync(run.file, path.join(directory, 'qa-v4-recording.mp4'));
-  assert.throws(() => exporter.artifact(run.id, 'qa-v4-recording.mp4'), /unsafe_export_storage/);
+  assert.throws(() => exporter.artifact(run.id, 'qa-v5-state.json'), /export_not_ready/);
+  assert.throws(() => exporter.artifact(run.id, '../qa-v5-summary.json'), /export_not_ready/);
+  fs.symlinkSync(run.file, path.join(directory, 'qa-v5-recording.mp4'));
+  assert.throws(() => exporter.artifact(run.id, 'qa-v5-recording.mp4'), /unsafe_export_storage/);
   assert.throws(() => new Exporter(store), /unsafe_export_storage/);
 });

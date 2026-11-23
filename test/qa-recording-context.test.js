@@ -92,7 +92,7 @@ test('display cursor maps exact Retina window pixels through global points and d
   const cue = displayCue(cues, 95, frame);
   assert.deepEqual(cue.point, { x: .3, y: .25 });
   assert.deepEqual(fitPoint(cue.point, 1000, 800, 1280, 720), { x: 460, y: 180 });
-  assert.equal(qaEditPlan(events, 200).segments[0].role, 'preceding-input', 'Presentation records do not sever strict input association');
+  assert.equal(qaEditPlan(events, 200).segments.find(s => s.kind === 'evidence').role, 'preceding-input', 'Presentation records do not sever strict input association');
   for (const mutate of [
     f => { f.recording.windowHeader.pid++; },
     f => { f.recording.windowHeader.initialWindowRectPoints[0]++; },
@@ -202,13 +202,13 @@ test('decoded QA MP4 contains selected display context and correctly placed curs
   exporter.request(run.id, false, 'qa');
   const state = await exporter.wait(run.id, 30000, 'qa');
   assert.equal(state.status, 'ready', JSON.stringify(state));
-  assert.equal(state.durationMs, 110);
-  const evidence = JSON.parse(fs.readFileSync(exporter.artifact(run.id, 'qa-v4-summary.json').file));
+  assert.ok(state.durationMs >= 8000);
+  const evidence = JSON.parse(fs.readFileSync(exporter.artifact(run.id, 'qa-v5-summary.json').file));
   assert.equal(evidence.sourceFrames.length, 2);
   assert.equal(evidence.recordingFrames.length, 1);
   assert.ok(evidence.segments.some(s => s.recordingScope === 'display'));
   const rgb = path.join(root, 'decoded.rgb');
-  await mediaProcess('ffmpeg', ['-v', 'error', '-i', exporter.artifact(run.id, 'qa-v4-recording.mp4').file,
+  await mediaProcess('ffmpeg', ['-v', 'error', '-i', exporter.artifact(run.id, 'qa-v5-recording.mp4').file,
     '-vf', 'fps=100,crop=50:50:450:170', '-f', 'rawvideo', '-pix_fmt', 'rgb24', rgb]);
   const pixels = fs.readFileSync(rgb);
   let blue = 0, cyan = 0;

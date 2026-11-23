@@ -135,7 +135,7 @@ test('scoped MCP records the real OCR transition with one native click and only 
     assert(!Object.hasOwn(finished, 'checks'));
     const report = (await call('qa_report', { runId, compact: true, waitMs: 10000 })).structuredContent;
     assert.equal(report.export.status, 'ready', JSON.stringify(report));
-    for (const name of ['qa-v4-recording.mp4', 'qa-v4-poster.jpg', 'qa-v4-summary.json'])
+    for (const name of ['qa-v5-recording.mp4', 'qa-v5-poster.jpg', 'qa-v5-summary.json'])
       assert(fs.statSync(report.artifacts[name]).size > 0, `Compact report retains ${name}`);
     assert(!Object.hasOwn(report, 'reportMarkdown'));
     const replay = (await call('qa_replay', { runId, stepId: checkId })).structuredContent;

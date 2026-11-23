@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { ReplayEntry } from '../web/replay-entry.js';
-import { qaClipAt, qaEditPlan, QA_EDIT_VERSION } from '../web/qa-edit.js';
+import { qaClipAt, qaSegmentAt, qaEditPlan, QA_EDIT_VERSION, QA_EDIT_POLICY } from '../web/qa-edit.js';
 import * as liveVideo from '../web/live-video.js';
 import * as cursorModel from '../web/action-cues.js';
 import { isDesktop, targetIdentity, targetLabel, sameTarget } from '../web/target-identity.js';
@@ -23,7 +23,7 @@ const recording = { runId, title: 'Saved real-run timing fixture', durationMs: 7
     { kind: 'step-start', stepId: passId, operation: 'assert-count', elapsedMs: passed.startedMs },
     { kind: 'assertion', ...passed },
     { kind: 'step-start', stepId: failureId, operation: 'assert-count', elapsedMs: failed.startedMs },
-    { kind: 'assertion', ...failed }, { kind: 'run-end', elapsedMs: 75584 }], 75584) };
+    { kind: 'assertion', ...failed }, { kind: 'run-end', elapsedMs: 75584 }], 75584, { ...QA_EDIT_POLICY, reviewPauses: false }) };
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
 
 class Element extends EventTarget {
@@ -75,7 +75,7 @@ async function workspace({ rejectPlay = false, storedMode = null, exportStatus =
   for (const element of elements.values()) element.focus = () => { document.activeElement = element; };
   const response = data => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => data });
   let currentExport = exportStatus;
-  const context = vm.createContext({ ReplayEntry, qaClipAt, qaEditPlan, QA_EDIT_VERSION, recordingFilename, isDesktop, targetIdentity, targetLabel, sameTarget, ...liveVideo, ...cursorModel, ...codecs,
+  const context = vm.createContext({ ReplayEntry, qaClipAt, qaSegmentAt, qaEditPlan, QA_EDIT_VERSION, recordingFilename, isDesktop, targetIdentity, targetLabel, sameTarget, ...liveVideo, ...cursorModel, ...codecs,
     document, window, location, URLSearchParams, URL,
     sessionStorage: { getItem: key => { storageReads.push(key); return storedMode; } },
     performance: live?.clock ?? performance, AbortController, AbortSignal, console, Option: class extends Element {}, navigator: { clipboard },
@@ -148,6 +148,23 @@ test('review download attributes use descriptive names and distinguish QA video 
   assert.equal(w.$('review-title').textContent, 'Nimbus Studio - Menu opens');
   assert.equal(w.$('download').download, `Nimbus Studio - Menu opens - QA recording - ${runId}.mp4`);
   assert.equal(w.$('source-download').download, `Nimbus Studio - Menu opens - full-session recording - ${runId}.mp4`);
+});
+
+test('default paced review starts at the selected check opening and explains reading pauses', async () => {
+  const edit = qaEditPlan([{ kind: 'run-start', elapsedMs: 0 },
+    ...[passed, failed].flatMap(check => [
+      { kind: 'step-start', operation: 'assert-count', stepId: check.stepId, elapsedMs: check.startedMs },
+      { kind: 'assertion', ...check },
+    ]), { kind: 'run-end', elapsedMs: 75584 }], 75584);
+  const w = await workspace({ replay: async () => ({ ...recording, edit, selected: failed }) });
+  w.metadata(); await settle();
+  assert.equal(w.video.currentTime.toFixed(9), '9.014580055', 'The first clip adds two seconds opening and four seconds result reading');
+  assert.equal(w.video.playbackRate, 1);
+  assert.match(w.$('review-estimate').textContent, /reading pauses/);
+  assert.match(w.$('review-estimate').textContent, /At least 8 seconds per check/);
+  assert.equal(w.$('selected-title').textContent, failed.title);
+  w.video.dispatchEvent(new Event('timeupdate'));
+  assert.equal(w.$('pacing-state').textContent, 'Review pause', 'Pause explanation is in webpage controls, not video pixels');
 });
 
 test('video surface and overlay each toggle once; polling preserves user pause and seek', async () => {
@@ -282,7 +299,7 @@ test('QA-only media ignores stale mode preferences and plays edited intervals at
   const w = await workspace({ storedMode: 'full' }); w.metadata(); await settle(); w.video.pause();
   assert.equal(w.hasElement('review-mode'), false);
   assert.deepEqual(w.storageReads, []);
-  assert.equal(w.video.src, `/api/runs/${runId}/qa-v4-recording.mp4#export=4-0`);
+  assert.equal(w.video.src, `/api/runs/${runId}/qa-v5-recording.mp4#export=5-0`);
   assert.equal(w.$('download').href, w.video.src);
   assert.equal(w.video.currentTime.toFixed(9), '3.014580055');
   assert.equal(w.video.playbackRate, 1);
@@ -316,13 +333,13 @@ test('obsolete ready media cannot play; a newly published generation reloads at 
   version = QA_EDIT_VERSION; generation++;
   await w.navigate(failureId); w.metadata(); await settle();
   assert.equal(w.video.hidden, false);
-  assert.match(w.video.src, /qa-v4-recording.mp4#export=4-1$/);
+  assert.match(w.video.src, /qa-v5-recording.mp4#export=5-1$/);
   w.video.currentTime = 12;
   generation++; await w.navigate(failureId);
   assert.equal(w.video.readyState, 0, 'New media publication must not retain the loaded previous generation');
   w.metadata(); await settle();
   assert.equal(w.video.currentTime, recording.edit.clips[1].startMs / 1000);
-  assert.match(w.video.src, /#export=4-2$/);
+  assert.match(w.video.src, /#export=5-2$/);
 });
 
 test('a check without a QA clip stays inspectable but never seeks or starts unrelated footage', async () => {
@@ -349,7 +366,7 @@ test('recording rows preserve long titles and expose only recorded outcomes', as
   assert.equal(w.$('review-outcome').textContent, '1 passed · 1 failed');
   assert.ok(!row.querySelectorAll('span').some(element => /^(FAIL|FAILED)$/.test(element.textContent)));
   assert.equal(row.querySelectorAll('h3')[0].textContent, title);
-  assert.equal(row.querySelectorAll('img')[0].src, `/api/runs/${runId}/qa-v4-poster.jpg`);
+  assert.equal(row.querySelectorAll('img')[0].src, `/api/runs/${runId}/qa-v5-poster.jpg`);
   const outcomes = row.querySelectorAll('p')[0].children.map(c => c.textContent);
   assert.deepEqual(outcomes, ['1 passed', '1 failed']);
   assert.equal(w.$('recordings-empty').hidden, true);

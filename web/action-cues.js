@@ -1,6 +1,6 @@
 import { sameTarget, sameSnapshotIdentity, isDesktop } from './target-identity.js';
 
-export const CURSOR_VERSION = 2;
+export const CURSOR_VERSION = 3;
 export const CUE_LIFETIME_MS = 900;
 export const CUE_LEGEND = 'Synthetic input visualization · native ACK is not a check';
 const rect = r => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite) && r[2] > 0 && r[3] > 0;

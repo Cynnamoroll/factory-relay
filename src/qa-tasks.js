@@ -25,7 +25,7 @@ export function report(broker, id) {
     ...c, replayUrl: url(broker, id, c.stepId), clip: edit.clips.find(clip => clip.stepId === c.stepId) ?? null,
   }));
   const artifacts = exported.status === 'ready' ? Object.fromEntries(
-    ['qa-v4-recording.mp4', 'qa-v4-poster.jpg', 'qa-v4-summary.json'].map(name => [name, broker.exports.artifact(id, name).file])) : {};
+    ['qa-v5-recording.mp4', 'qa-v5-poster.jpg', 'qa-v5-summary.json'].map(name => [name, broker.exports.artifact(id, name).file])) : {};
   const sourceExport = broker.exports.state(id);
   const sourceArtifact = sourceExport.status === 'ready' ? broker.exports.artifact(id, 'recording.mp4').file : null;
   const replayUrl = url(broker, id, first?.stepId);
@@ -33,11 +33,11 @@ export function report(broker, id) {
     ...checks.slice(0, 20).map(c => `- [${markdownText(c.title)}](${c.replayUrl}): **${c.status}**; expected ${markdownText(c.expected)}, observed ${markdownText(c.actual ?? 'unavailable')}.${c.kind === 'visual' ? ` Visual assessment by ${c.assessment.actor}; not server-verified.` : ''}${c.context ? ' ' + markdownText(c.context) : ''}${c.clip ? ` Source ${(c.clip.sourceStartMs / 1000).toFixed(3)}–${(c.clip.sourceEndMs / 1000).toFixed(3)}s; QA video ${(c.clip.startMs / 1000).toFixed(3)}–${(c.clip.endMs / 1000).toFixed(3)}s.` : ' No QA clip.'}`),
     ...(summary.checks.length > 20 ? [`Showing ${Math.min(20, summary.checks.length)} of ${summary.checks.length} checks, non-passing first. Use paginated qa_replay for all results.`] : []),
     `[Open QA review](${replayUrl})`];
-  if (artifacts['qa-v4-recording.mp4']) lines.push(`[![QA recording preview](${artifacts['qa-v4-poster.jpg']})](${replayUrl})`,
-    `[Download QA video](${artifacts['qa-v4-recording.mp4']}) · [QA edit provenance](${artifacts['qa-v4-summary.json']})`);
+  if (artifacts['qa-v5-recording.mp4']) lines.push(`[![QA recording preview](${artifacts['qa-v5-poster.jpg']})](${replayUrl})`,
+    `[Download QA video](${artifacts['qa-v5-recording.mp4']}) · [QA edit provenance](${artifacts['qa-v5-summary.json']})`);
   else lines.push(`QA video export: ${exported.status}. ${edit.available && !edit.clips.length ? 'No completed passing or failing QA checks.' : !edit.available ? edit.reason : 'Prepare with qa_report.'}`);
   if (sourceArtifact) lines.push(`[Full session evidence, separate from QA video](${sourceArtifact})`);
-  lines.push(`QA video contains only recorded evidence for passing and failing checks: ${(edit.durationMs / 1000).toFixed(3)}s edited; ${(edit.evidenceMs / 1000).toFixed(3)}s evidence from ${(summary.durationMs / 1000).toFixed(3)}s source. Only conservatively associated preceding input is included as context, not causal proof. Setup, ownership transitions and idle between operations are omitted. Missing footage inside QA is marked.`,
+  lines.push(`QA review: ${(edit.durationMs / 1000).toFixed(3)}s playback, including ${(edit.presentationMs / 1000).toFixed(3)}s of review pauses and ${(edit.evidenceMs / 1000).toFixed(3)}s of evidence from ${(summary.durationMs / 1000).toFixed(3)}s source. Pauses hold recorded frames; they are not continued capture. The webpage identifies pauses outside the video; no text is burned into the MP4. Each check has at least eight seconds at 1× speed. Only conservatively associated preceding input is included as context, not causal proof. Setup, ownership transitions and idle between operations are omitted. Missing footage remains blank and is identified in provenance.`,
     'All checks and operational errors remain in Results JSON. Labels and intentional-test descriptions are caller supplied. Local replay requires an authenticated browser. No inline chat-player claim.');
   const { checks: _, ...overview } = summary;
   return { ...overview, checks, checksTruncated: summary.checks.length > checks.length, replayUrl, edit,

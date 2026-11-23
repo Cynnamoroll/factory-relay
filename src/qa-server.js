@@ -163,7 +163,7 @@ export function createQAServer(broker, { agentToken = secret(), pairingCode = se
         return send(200, fs.readFileSync(path.join(web, name)), type);
       }
       if (['cross-site', 'same-site'].includes(req.headers['sec-fetch-site'])) return send(403, { error: 'origin_rejected' });
-      const artifact = req.url.match(/^\/api\/runs\/([a-f0-9]{32})\/((?:qa-(?:v[234]-)?)?recording\.mp4|(?:qa-(?:v[234]-)?)?poster\.jpg|(?:qa-(?:v[234]-)?)?summary\.json)$/);
+      const artifact = req.url.match(/^\/api\/runs\/([a-f0-9]{32})\/((?:qa-(?:v[2345]-)?)?recording\.mp4|(?:qa-(?:v[2345]-)?)?poster\.jpg|(?:qa-(?:v[2345]-)?)?summary\.json)$/);
       const windowMedia = req.url.match(/^\/api\/window-overview\/([a-f0-9]{32})\/(frame|stream)$/);
       const directMedia = req.method === 'GET' && (artifact || windowMedia) && req.headers['sec-fetch-site'] === 'same-origin';
       if (req.headers['x-qa-request'] !== '1' && !directMedia) return send(403, { error: 'csrf_rejected' });

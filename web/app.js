@@ -1,6 +1,6 @@
 import { ReplayEntry } from './replay-entry.js';
 import { parseAnnexB, annexbToAvcc, avccDescription, codecString, parameterSets, equalBytes, webCodecsVideo } from './live-video.js';
-import { qaClipAt, QA_EDIT_VERSION } from './qa-edit.js';
+import { qaClipAt, qaSegmentAt, QA_EDIT_VERSION } from './qa-edit.js';
 import { isDesktop, targetIdentity, targetLabel, sameTarget } from './target-identity.js';
 import { fitPoint, cueLabel, CUE_LEGEND, cueAt } from './action-cues.js';
 import { recordingFilename } from './recording-name.js';
@@ -569,7 +569,7 @@ async function history() {
     const card = node('button', 'recording-card'), poster = node('div', 'card-poster');
     card.setAttribute('aria-label', `Review ${r.title}, ${r.counts.pass} passed, ${r.counts.fail} failed`);
     if (r.export.status === 'ready' && r.export.version === QA_EDIT_VERSION) {
-      const img = node('img'); img.src = `/api/runs/${r.runId}/qa-v4-poster.jpg`; img.alt = ''; poster.append(img);
+      const img = node('img'); img.src = `/api/runs/${r.runId}/qa-v5-poster.jpg`; img.alt = ''; poster.append(img);
     }
     poster.append(node('span', 'card-play', r.status === 'running' ? 'Recording' : 'Review'));
     const body = node('div', 'card-body'), title = node('h3', '', r.title);
@@ -740,13 +740,13 @@ async function loadRun(id, step, refresh = false, automatic = false) {
   renderChecks();
   if (result.export.status === 'ready' && result.export.version === QA_EDIT_VERSION && result.edit?.version === QA_EDIT_VERSION && result.edit?.available && result.edit.clips.length) {
     $('player-empty').hidden = true; video.hidden = false; $('preview').hidden = true;
-    const src = `/api/runs/${id}/qa-v4-recording.mp4#export=${result.export.version}-${result.export.encodedAt ?? 0}`;
+    const src = `/api/runs/${id}/qa-v5-recording.mp4#export=${result.export.version}-${result.export.encodedAt ?? 0}`;
     if (loadedVideo !== src) {
       video.pause(); video.src = src; loadedVideo = src; video.load();
     }
     $('download').href = src; $('download').hidden = false;
     $('download').download = recordingFilename(result.title, id, `qa-v${QA_EDIT_VERSION}-recording.mp4`);
-    $('export-status').textContent = `Portable H.264 MP4 · ${(result.export.bytes / 1024 / 1024).toFixed(1)} MiB · recorded check footage only; missing footage is marked.`;
+    $('export-status').textContent = `Portable H.264 MP4 · ${(result.export.bytes / 1024 / 1024).toFixed(1)} MiB · clean recorded frames and cursor only; review pauses and gaps are documented separately.`;
   } else {
     video.pause(); video.hidden = true; loadedVideo = null; video.removeAttribute('src'); video.load();
     $('player-empty').hidden = false; $('download').hidden = true;
@@ -863,6 +863,11 @@ function showCheck(c) {
 function synchronize(seconds) {
   $('seek').value = seconds;
   $('time').textContent = `${formatTime(seconds * 1000)} / ${formatTime(run?.edit?.durationMs ?? 0)}`;
+  const segment = qaSegmentAt(run?.edit, Math.min(seconds * 1000, Math.max(0, (run?.edit?.durationMs ?? 0) - 0.001)));
+  $('pacing-state').textContent = segment?.kind === 'review-hold' ? 'Review pause' : 'Recorded interval';
+  $('pacing-state').title = segment?.kind === 'review-hold'
+    ? 'Time to inspect a held recorded frame, not continued capture. Check details remain below the video.'
+    : 'Original recorded timing. Missing footage remains blank and is identified in the provenance.';
   if (video.paused && selectedStep && !clipFor(selectedStep)) return;
   // Chromium truncates media time to microseconds; keep a cut on its new check.
   const clip = qaClipAt(run?.edit, Math.min(seconds * 1000 + 0.001, Math.max(0, (run?.edit?.durationMs ?? 0) - 0.001)));
@@ -879,6 +884,7 @@ function synchronize(seconds) {
 video.addEventListener('timeupdate', () => synchronize(video.currentTime));
 function playbackState(label) {
   const ready = Boolean(loadedVideo && video.readyState > 0 && !video.error);
+  $('pacing-state').hidden = !ready;
   $('play').disabled = !ready; $('seek').disabled = !ready; $('speed').disabled = !ready;
   $('play').setAttribute('data-playing', String(!video.paused));
   $('play').setAttribute('aria-label', video.paused ? 'Play recording' : 'Pause recording');
@@ -908,7 +914,7 @@ playbackState();
 $('seek').addEventListener('input', () => { replayEntry.cancel(); seek(Number($('seek').value) * 1000); });
 function configureReview() {
   video.playbackRate = Number($('speed').value) || 1;
-  $('review-estimate').textContent = `${formatTime(run?.edit?.durationMs ?? 0)} QA video · ${formatTime(run?.durationMs ?? 0)} source`;
+  $('review-estimate').textContent = `${formatTime(run?.edit?.durationMs ?? 0)} QA review · ${formatTime(run?.edit?.presentationMs ?? 0)} reading pauses · ${formatTime(run?.durationMs ?? 0)} source. At least 8 seconds per check at 1×.`;
 }
 $('speed').addEventListener('change', configureReview);
 async function togglePlay() {

@@ -56,7 +56,7 @@ if (mode === '--prepare') {
     const exportState = await broker.exports.wait(r.id, 30000, 'qa');
     if (exportState.status !== 'ready') throw new Error(exportState.code ?? 'fixture_export_not_ready');
     console.log(JSON.stringify({ directory: root, runId: r.id, failureStepId: r.events.find(e => e.kind === 'assertion' && e.status === 'fail').stepId,
-      video: broker.exports.artifact(r.id, 'qa-v4-recording.mp4').file, durationMs: exportState.durationMs }));
+      video: broker.exports.artifact(r.id, 'qa-v5-recording.mp4').file, durationMs: exportState.durationMs }));
   } finally { await broker.close(); }
 } else {
   const service = createQAServer(broker);

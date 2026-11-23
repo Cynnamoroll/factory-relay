@@ -1,4 +1,4 @@
-import { actionCues, cueAt, cueGeometry, cueLabel, CUE_LEGEND, fitPoint } from '../web/action-cues.js';
+import { actionCues, cueAt, cueGeometry, fitPoint } from '../web/action-cues.js';
 import { displayConfigurationSchema, sameTarget, sameDisplayConfiguration } from './window-target.js';
 
 export function displayCue(cues, at, frame) {
@@ -35,9 +35,13 @@ export function cursorPresentation(events, segments, durationMs) {
     '[V4+ Styles]', 'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
     'Style: Default,DejaVu Sans,17,&H00FFFFFF,&H00FFFFFF,&H00101318,&H90101318,0,0,0,0,100,100,0,0,1,2,0,7,12,12,12,1',
     '[Events]', 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
-    dialogue(0, durationMs, `{\\an1\\pos(12,708)}${CUE_LEGEND}`),
   ];
   for (const segment of segments) {
+    if (segment.reviewHold) {
+      packets.push(segment);
+      if (packets.length > 26000) throw new Error('cursor_packet_limit');
+      continue;
+    }
     const sourceStart = segment.sourceStartMs ?? segment.startMs;
     const sourceEnd = sourceStart + segment.endMs - segment.startMs;
     const cuts = new Set([sourceStart, sourceEnd]);
@@ -56,7 +60,6 @@ export function cursorPresentation(events, segments, durationMs) {
       const frame = frames.get(segment.frameId), cue = segment.kind === 'frame' &&
         (frame?.kind === 'recording-frame' ? displayCue(cues, at, frame) : cueAt(cues, at, frame?.header));
       if (!cue) continue;
-      lines.push(dialogue(start, end, `{\\an9\\pos(1268,48)}${cueLabel(cue)}`));
       if (!cue.point) continue;
       const p = fitPoint(cue.point, frame.header.width, frame.header.height, 1280, 720);
       const x = Math.round(p.x), y = Math.round(p.y), color = cue.actor === 'agent' ? '&H00E8D040&' : '&H00FFAAEE&';

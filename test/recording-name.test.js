@@ -46,8 +46,8 @@ test('first named check supplies a durable purpose without changing original jou
 
 test('download names preserve Unicode, run identity, extension and variant without unsafe characters or header injection', () => {
   const runId = 'a'.repeat(32), title = '雲 Studio - Check "menu"/path\\name\r\nInjected: yes\u0000';
-  for (const [artifact, suffix] of [['qa-v4-recording.mp4', 'QA recording'], ['recording.mp4', 'full-session recording'],
-    ['qa-v4-poster.jpg', 'QA poster'], ['summary.json', 'full-session summary']]) {
+  for (const [artifact, suffix] of [['qa-v5-recording.mp4', 'QA recording'], ['recording.mp4', 'full-session recording'],
+    ['qa-v5-poster.jpg', 'QA poster'], ['summary.json', 'full-session summary']]) {
     const name = recordingFilename(title, runId, artifact);
     assert.match(name, /^雲 Studio - Check menu path name Injected yes - /);
     assert.ok(name.endsWith(`${suffix} - ${runId}.${artifact.split('.').at(-1)}`));
@@ -57,7 +57,7 @@ test('download names preserve Unicode, run identity, extension and variant witho
     assert.equal(decodeURIComponent(disposition.split("filename*=UTF-8''")[1]), name);
     assert.match(disposition, /^inline; filename="[ -~]+"; filename\*=UTF-8''/);
   }
-  assert.ok(Buffer.byteLength(recordingFilename('🧪'.repeat(160), runId, 'qa-v4-recording.mp4')) <= 255);
+  assert.ok(Buffer.byteLength(recordingFilename('🧪'.repeat(160), runId, 'qa-v5-recording.mp4')) <= 255);
   const longName = recordingFilename(`雲${'🧪'.repeat(119)} - Menu opens`, runId, 'recording.mp4');
   assert.ok(Buffer.byteLength(longName) <= 255);
   assert.match(longName, /^雲.*Menu opens - full-session recording/u);
@@ -91,8 +91,9 @@ test('recorded names survive recovery and reach results, exported MP4 metadata a
   const origin = await service.listen(0), auth = { Authorization: `Bearer ${service.agentToken}`, 'X-QA-Request': '1' };
   for (const variant of ['source', 'qa']) {
     broker.exports.request(run.id, false, variant);
-    assert.equal((await broker.exports.wait(run.id, 30000, variant)).status, 'ready');
-    const prefix = variant === 'qa' ? 'qa-v4-' : '';
+    const state = await broker.exports.wait(run.id, 30000, variant);
+    assert.equal(state.status, 'ready', JSON.stringify({ variant, ...state }));
+    const prefix = variant === 'qa' ? 'qa-v5-' : '';
     const summary = JSON.parse(fs.readFileSync(broker.exports.artifact(run.id, prefix + 'summary.json').file));
     assert.equal(summary.title, 'Nimbus Studio - Menu opens');
     assert.equal(summary.applicationName, 'Nimbus Studio');

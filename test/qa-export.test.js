@@ -86,10 +86,10 @@ test('timestamped JPEG spool exports real variable-timestamp H264, captions, exp
   assert.equal(report.sourceArtifact, artifact.file);
   assert.equal(report.export.status, 'ready', JSON.stringify(report.export));
   assert.match(report.reportMarkdown, /expected 5, observed 1/);
-  assert.ok(report.reportMarkdown.includes(`[![QA recording preview](${report.artifacts['qa-v4-poster.jpg']})](${report.replayUrl})`),
+  assert.ok(report.reportMarkdown.includes(`[![QA recording preview](${report.artifacts['qa-v5-poster.jpg']})](${report.replayUrl})`),
     'Chat uses a visible poster linked to replay, not an unsupported inline MP4 image');
   assert.ok(!report.reportMarkdown.includes(`![QA recording](${artifact.file})`));
-  assert.ok(report.reportMarkdown.includes(`[Download QA video](${report.artifacts['qa-v4-recording.mp4']})`));
+  assert.ok(report.reportMarkdown.includes(`[Download QA video](${report.artifacts['qa-v5-recording.mp4']})`));
   assert.ok(report.reportMarkdown.includes(`[Full session evidence, separate from QA video](${artifact.file})`));
   assert.ok(!JSON.stringify(report).includes(service.agentToken));
   await broker.exports.close();
@@ -97,7 +97,7 @@ test('timestamped JPEG spool exports real variable-timestamp H264, captions, exp
   assert.equal(reopened.state(run.id).status, 'ready');
   assert.equal(reopened.artifact(run.id, 'recording.mp4').size, artifact.size);
   await reopened.close();
-  fs.writeFileSync(path.join(reopened.root, run.id, 'source-v1-state.json'), '{"status":', { mode: 0o600 });
+  fs.writeFileSync(path.join(reopened.root, run.id, 'source-v2-state.json'), '{"status":', { mode: 0o600 });
   const interruptedExport = new Exporter(store);
   assert.equal(interruptedExport.state(run.id).code, 'export_interrupted');
   assert.equal(interruptedExport.request(run.id).status, 'error', 'A failed export requires explicit read-only retry');

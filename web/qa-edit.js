@@ -1,8 +1,11 @@
 import { sameTarget as targetEquals, isDesktop, sameSnapshotIdentity } from './target-identity.js';
 
-export const QA_EDIT_VERSION = 4;
+export const QA_EDIT_VERSION = 5;
 export const QA_EDIT_POLICY = Object.freeze({ maxEvents: 12001, maxClips: 256, maxSegments: 12001,
-  maxDurationMs: 690000, maxEditedDurationMs: 690000 });
+  maxDurationMs: 690000, maxEditedDurationMs: 690000,
+  reviewPauses: true, openingHoldMs: 2000, minClipMs: 8000,
+  minResultHoldMs: 4000, maxResultHoldMs: 20000, readingWordsPerSecond: 3,
+  maxReviewDurationMs: 690000 + 256 * (2000 + 20000) });
 const kinds = new Set(['run-start', 'run-end', 'frame', 'gap', 'ownership', 'step-start', 'step-end',
   'action-attempt', 'action', 'observation', 'assertion', 'recording-limit', 'recording-frame', 'recording-scope']);
 const id = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
@@ -59,7 +62,7 @@ function precedingInput(events, checkStart, assertion, starts, frames) {
 }
 
 /** Only associated input and assertion intervals contribute playback time. */
-export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
+function evidencePlan(events, sourceDurationMs, policy) {
   const unavailable = reason => ({ version: QA_EDIT_VERSION, available: false, reason, sourceDurationMs, durationMs: 0, clips: [], segments: [] });
   if (!Array.isArray(events) || events.length < 2 || events.length > policy.maxEvents ||
       !Number.isFinite(sourceDurationMs) || sourceDurationMs <= 0 || sourceDurationMs > policy.maxDurationMs ||
@@ -150,6 +153,42 @@ export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
   }
   return { version: QA_EDIT_VERSION, available: true, sourceDurationMs, durationMs, evidenceMs,
     presentationMs: durationMs - evidenceMs, omittedMs: sourceDurationMs - evidenceMs, clips, segments };
+}
+/** Review pauses hold authentic frames; they never extend source evidence time. */
+export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
+  const plan = evidencePlan(events, sourceDurationMs, policy);
+  if (!plan.available || !policy.reviewPauses) return plan;
+  const clips = [], segments = [];
+  let durationMs = 0;
+  for (const clip of plan.clips) {
+    const original = plan.segments.filter(s => s.stepId === clip.stepId);
+    const evidenceMs = clip.endMs - clip.startMs;
+    // Three words/second is a reading allowance, not a capture or application speed.
+    const words = [clip.title, clip.expected, clip.actual].join(' ').trim().split(/\s+/u).length;
+    const resultMs = Math.max(policy.minResultHoldMs,
+      Math.min(policy.maxResultHoldMs, Math.ceil(words / policy.readingWordsPerSecond * 1000)),
+      policy.minClipMs - policy.openingHoldMs - evidenceMs);
+    const startMs = durationMs;
+    const hold = (role, ms) => {
+      segments.push({ kind: 'review-hold', role, stepId: clip.stepId, startMs: durationMs,
+        endMs: durationMs + ms, mapping: 'held-frame',
+        ...(role === 'result-review' && clip.frameId ? { frameId: clip.frameId } : {}),
+        title: clip.title, status: clip.status, assessment: clip.assessment,
+        expected: clip.expected, actual: clip.actual });
+      durationMs += ms;
+    };
+    hold('check-opening', policy.openingHoldMs);
+    for (const segment of original) {
+      const ms = segment.endMs - segment.startMs;
+      segments.push({ ...segment, startMs: durationMs, endMs: durationMs + ms });
+      durationMs += ms;
+    }
+    hold('result-review', resultMs);
+    clips.push({ ...clip, startMs, endMs: durationMs });
+  }
+  if (durationMs > policy.maxReviewDurationMs || segments.length > policy.maxSegments)
+    return { ...plan, available: false, reason: 'QA review exceeds presentation bounds.', durationMs: 0, clips: [], segments: [] };
+  return { ...plan, clips, segments, durationMs, presentationMs: durationMs - plan.evidenceMs };
 }
 export function qaClipAt(plan, editedMs) {
   if (!plan?.available || !Number.isFinite(editedMs)) return null;

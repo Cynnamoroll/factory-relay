@@ -45,7 +45,7 @@ Live viewing, QA videos, full-session exports, and their posters show synthetic
 input cues. Agent and human inputs have distinct colors. A coordinate left single
 click shows a plain cursor only when matching run, target, process,
 snapshot layout, and capture geometry establish a point. Element presses without
-coordinates remain labeled nonspatial actions. Attempts, native acknowledgement,
+coordinates are described outside the video. Attempts, native acknowledgement,
 blocked input, and uncertain input are distinct. An ACK is not a passing check.
 
 Cursor travel between known points is a visualization, not captured physical
@@ -57,14 +57,20 @@ For display-context recordings, markers map validated window snapshot points
 through global display bounds, capture attachment geometry, and export
 letterboxing. Window-normalized coordinates are never treated as desktop input.
 
-Downloaded MP4s include the same labeled visualization. Presentation samples
-subdivide existing receive-clock evidence intervals without adding dwell time or
-filling missing footage. Read-only observations can connect a recorded input to a
+Downloaded MP4s contain clean recorded pixels and plain cursor arrows, with no
+added text, captions, legends, or check-result overlays. Each QA check has a
+two-second opening pause and a result-reading pause, with at least eight seconds
+of playback at 1×. Result pauses allow roughly three words per second, bounded
+between four and twenty seconds. These pauses hold authentic recorded frames and
+are identified by the webpage's controls and provenance, not burned-in labels.
+They are not continued capture. Recorded evidence retains
+its original timing, gaps, and source mapping; pause time is reported separately.
+Read-only observations can connect a recorded input to a
 later check only when actor, target, process, and layout still match, with no
 intervening mutation, ownership change, or recording gap. This is context, not
 proof of causation. Assertion validation is unchanged.
 
-QA edit version 4 and source overlay generation 1 use new export filenames.
+QA edit version 5 and source overlay generation 2 use separate export filenames.
 Previously stored journals, raw frames, and older export generations remain
 intact. Preparing a recording again derives the current marked video locally.
 

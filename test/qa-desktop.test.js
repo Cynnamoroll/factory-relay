@@ -308,7 +308,7 @@ test('explicit MCP desktop run exports caller-assessed synthetic display pixels 
   assert.match(report.reportMarkdown, /not server-verified/);
   assert.deepEqual(report.target, target);
   assert.ok(report.edit.segments.some(s => s.role === 'assessed-frame'));
-  const mp4 = report.artifacts['qa-v4-recording.mp4'];
+  const mp4 = report.artifacts['qa-v5-recording.mp4'];
   const probe = JSON.parse(await mediaProcess('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'json', mp4]));
   assert.ok(Number(probe.format.duration) > 0);
   const decoded = path.join(root, 'decoded.rgb');

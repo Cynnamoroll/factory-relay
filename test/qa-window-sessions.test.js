@@ -798,7 +798,7 @@ test('closing a lane does not shut down its shared exporter or remove the MP4', 
   await session.close();
   const state = await f.broker.exports.wait(session.runId, 12000, 'qa');
   assert.equal(state.status, 'ready', JSON.stringify(state));
-  const route = `/api/runs/${session.runId}/qa-v4-recording.mp4`;
+  const route = `/api/runs/${session.runId}/qa-v5-recording.mp4`;
   const human = await f.pair();
   const response = await f.raw(route, null, undefined, 'GET', human);
   assert.equal(response.headers.get('content-type'), 'video/mp4');

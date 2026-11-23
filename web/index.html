@@ -83,9 +83,10 @@
 <button id="play" class="icon-button" aria-label="Play recording" title="Play / pause (Space)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 11 7-11 7Z" class="play-symbol"/><path d="M8 5v14M16 5v14" class="pause-symbol"/></svg></button>
 <button id="next" class="icon-button" aria-label="Next check" title="Next check ]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5v14M6 5l9 7-9 7Z"/></svg></button>
 <span id="time" role="timer" title="Elapsed time in edited video" aria-label="Playback time">0:00 / 0:00</span>
+<span id="pacing-state" class="muted"></span>
 <details id="playback-settings" class="review-menu"><summary id="playback-settings-toggle" aria-label="Playback settings" title="Playback settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="#121212"/><circle cx="15" cy="17" r="2" fill="#121212"/></svg></summary><div class="menu-body">
 <label>QA playback speed<select id="speed" aria-label="Review playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
-<p id="review-estimate" class="muted"></p><p class="fine">Recorded check footage only. Associated preceding input is context, not proof of causation. Unrelated footage is omitted.</p>
+<p id="review-estimate" class="muted"></p><p class="fine">Each check includes reading pauses before and after its recorded evidence. Pauses hold authentic frames, not continued capture. Videos contain no added text. Associated preceding input is context, not proof of causation. Unrelated footage is omitted; missing footage stays blank and is identified in the provenance.</p>
 <p class="fine">Space play/pause · ← → seek 5s · [ ] previous/next check · F fullscreen</p>
 <p class="fine">Green sections passed; red sections failed. Click a section to open its check, or drag to scrub. Sampled footage has marked gaps. Outcomes describe checks, not continuous verification.</p>
 </div></details>
