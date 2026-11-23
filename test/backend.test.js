@@ -155,12 +155,12 @@ for (const mode of ['probe-success', 'probe-approval', 'probe-denied', 'probe-mi
     }
     const state = JSON.parse(await readFile(path.join(s.home, '.applets-control/state.json'), 'utf8'));
     if (mode === 'probe-end-failure') {
-      assert.ok(state.lease);
+      assert.equal(state.leases.length, 1, 'An unconfirmed bridge cleanup keeps the lease');
       assert.equal(JSON.parse(result.stderr).releaseError, 'busy');
       assert.ok((await stat(path.join(s.home, '.applets-control/bridge-session.json'))).isFile());
       assert.ok((await stat(path.join(s.home, '.applets-control/inflight'))).isFile());
     } else {
-      assert.equal(state.lease, null, 'Known cleanup completes before release');
+      assert.deepEqual(state.leases, [], 'Known cleanup completes before release');
       await assert.rejects(stat(path.join(s.home, '.applets-control/inflight')), { code: 'ENOENT' });
     }
   });

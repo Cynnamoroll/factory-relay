@@ -20,6 +20,8 @@ enum HostLifecycle {
 final class PermissionSetupController: NSWindowController, NSWindowDelegate {
     private let screenStatus = NSTextField(labelWithString: "")
     private let controlStatus = NSTextField(labelWithString: "")
+    private let readyStatus = NSTextField(labelWithString: "")
+    private let launchPermissions = (screen: CGPreflightScreenCaptureAccess(), control: AXIsProcessTrusted())
     private let screenButton = NSButton(title: "Enable screen recording", target: nil, action: nil)
     private let controlButton = NSButton(title: "Enable control", target: nil, action: nil)
     private let refreshButton = NSButton(title: "Check again", target: nil, action: nil)
@@ -44,6 +46,14 @@ final class PermissionSetupController: NSWindowController, NSWindowDelegate {
 
         let heading = NSTextField(labelWithString: "Allow Factory Relay to see and control this Mac")
         heading.font = .boldSystemFont(ofSize: 18)
+        let icon = NSImageView(image: NSApplication.shared.applicationIconImage)
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 56).isActive = true
+        let header = NSStackView(views: [icon, heading])
+        header.orientation = .horizontal
+        header.spacing = 14
+        readyStatus.font = .systemFont(ofSize: 13, weight: .semibold)
         let introduction = NSTextField(wrappingLabelWithString:
             "Choose each permission below. macOS requires your approval for Factory Relay. Opening this window does not request access."
         )
@@ -67,8 +77,8 @@ final class PermissionSetupController: NSWindowController, NSWindowDelegate {
         actions.orientation = .horizontal
         actions.spacing = 12
         let content = NSStackView(views: [
-            heading, introduction, screenStatus, screenButton, controlStatus, controlButton,
-            instructions, restartNotice, actions
+            header, introduction, screenStatus, screenButton, controlStatus, controlButton,
+            readyStatus, instructions, restartNotice, actions
         ])
         content.orientation = .vertical
         content.alignment = .leading
@@ -106,6 +116,9 @@ final class PermissionSetupController: NSWindowController, NSWindowDelegate {
         controlStatus.stringValue = controlPermissionName + ": " + (controlGranted ? "Enabled" : "Not enabled")
         screenButton.isEnabled = !screenGranted
         controlButton.isEnabled = !controlGranted
+        readyStatus.stringValue = screenGranted && controlGranted
+            ? "Factory Relay is ready. You can close this window; QA agents work in the background."
+            : "Factory Relay needs both permissions before agents can see or act on windows."
     }
 
     @objc private func requestScreenRecording() {
@@ -140,6 +153,8 @@ final class PermissionSetupController: NSWindowController, NSWindowDelegate {
         Task { @MainActor in
             do {
                 _ = try await NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration)
+                // A running background host also caches the old Screen Recording decision.
+                HostServer.stopRunning()
                 NSApplication.shared.terminate(nil)
             } catch {
                 refreshButton.isEnabled = true
@@ -151,11 +166,19 @@ final class PermissionSetupController: NSWindowController, NSWindowDelegate {
         }
     }
 
+    private func restartHostIfPermissionsChanged() {
+        if CGPreflightScreenCaptureAccess() != launchPermissions.screen || AXIsProcessTrusted() != launchPermissions.control {
+            HostServer.stopRunning()
+        }
+    }
+
     @objc private func done() {
+        restartHostIfPermissionsChanged()
         NSApplication.shared.terminate(nil)
     }
 
     func windowWillClose(_ notification: Notification) {
+        restartHostIfPermissionsChanged()
         NSApplication.shared.terminate(nil)
     }
 }
@@ -166,17 +189,22 @@ final class HostApplicationDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         HostLifecycle.launchFinished = true
-        if CommandLine.arguments.contains("--setup") {
+        // Opening the app from Finder (no arguments) shows setup rather than exiting silently.
+        if CommandLine.arguments.contains("--setup") || CommandLine.arguments.count == 1 {
             NSApplication.shared.setActivationPolicy(.regular)
             let controller = PermissionSetupController()
             permissionSetup = controller
             controller.showSetup()
             return
         }
-        Task { @MainActor in
-            await HostSession.run()
+        // The background host serves every relay client from one long-lived process, so permission
+        // checks, ScreenCaptureKit state and AX connections stay warm between requests.
+        let args = Array(CommandLine.arguments.dropFirst())
+        guard args.count == 2, args[0] == "serve" else {
             NSApplication.shared.terminate(nil)
+            return
         }
+        do { try HostServer.start(args[1]) } catch { NSApplication.shared.terminate(nil) }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {

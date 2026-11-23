@@ -2,12 +2,15 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import { configSchema } from './schema.js';
-import { quote } from './transport.js';
+import { transportCommand } from './transport.js';
 import { windowTargetSchema, desktopTargetSchema, targetSchema, displayConfigurationSchema, sameTarget } from './window-target.js';
+import { parseAnnexB } from '../web/live-video.js';
 
 export const HEADER_LIMIT = 8192;
 export const IMAGE_LIMIT = 4 * 1024 * 1024;
-const STREAM_ERRORS = new Set(['busy', 'stale_lease', 'lease_expired', 'unsafe_state', 'unsafe_peer',
+// Credits return over the SSH round trip (about 80-100 ms), so the window bounds the frame rate.
+export const STREAM_WINDOW = 8;
+const STREAM_ERRORS = new Set(['busy', 'stale_lease', 'lease_expired', 'lease_scope', 'unsafe_state', 'unsafe_peer',
   'unsupported_host', 'ipc_path_limit', 'invalid_request', 'invalid_stream',
   'stream_timeout', 'stream_closed', 'stream_interrupted', 'host_unavailable']);
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -27,13 +30,31 @@ const frameSchema = z.union([
     processStartedAt: z.number().finite().optional() }),
   z.strictObject({ ...frameFields, ...desktopTargetSchema.shape, displayConfiguration: displayConfigurationSchema }),
 ]);
+/**
+ * One H.264 access unit. Annex B on the wire: 4-byte start codes, keyframes prefixed with
+ * in-band SPS + PPS so a viewer can join at any keyframe (at most two seconds away).
+ */
+const vframeFields = {
+  protocol: z.literal(1), type: z.literal('vframe'), sequence: integer.min(1),
+  codec: z.literal('h264'), format: z.literal('annexb'), keyframe: z.boolean(),
+  width: integer.min(1).max(2048), height: integer.min(1).max(2048),
+  captureTimeSeconds: z.number().nonnegative().finite(), sentUptimeSeconds: z.number().nonnegative().finite(),
+  contentRectPixels: rect,
+  contentScale: z.number().positive().finite(), scaleFactor: z.number().positive().finite(),
+  replacedFrames: integer, bytes: integer.min(1).max(IMAGE_LIMIT),
+};
+const vframeSchema = z.union([
+  z.strictObject({ ...vframeFields, ...windowTargetSchema.shape, initialWindowRectPoints: rect,
+    processStartedAt: z.number().finite().optional() }),
+  z.strictObject({ ...vframeFields, ...desktopTargetSchema.shape, displayConfiguration: displayConfigurationSchema }),
+]);
 const diagnosticSchema = z.strictObject({
   protocol: z.literal(1), type: z.literal('diagnostic'), bytes: z.literal(0),
   code: z.enum(['permission_preflight', 'screen_recording_required', 'capture_unavailable']),
   bundleId: z.literal('com.factory.applets.host'), bundlePath: z.string().max(4096),
   executablePath: z.string().max(4096), screenRecording: z.boolean(),
   accessibility: z.boolean(), permissionRequested: z.literal(false),
-  launchMode: z.enum(['stdio', 'launchservices-ipc']).optional(),
+  launchMode: z.enum(['stdio', 'launchservices-ipc', 'persistent-ipc']).optional(),
   processId: integer.min(1).optional(), parentProcessId: integer.min(1).optional(),
   lifecycle: z.strictObject({
     appKitInitialized: z.boolean(), eventLoopRunning: z.boolean(),
@@ -52,9 +73,18 @@ const heartbeatSchema = z.strictObject({
   protocol: z.literal(1), type: z.literal('heartbeat'), bytes: z.literal(0),
   sentUptimeSeconds: z.number().nonnegative().finite(),
 });
-const headerSchema = z.union([frameSchema, diagnosticSchema, windowsSchema, heartbeatSchema]);
+const headerSchema = z.union([frameSchema, vframeSchema, diagnosticSchema, windowsSchema, heartbeatSchema]);
 
-/** Bounded packet buffering; consumer completion gates transport acknowledgments. */
+/** Structure check shared with the browser: NAL boundaries, header bits and keyframe contents. */
+function validVideoAccessUnit(image, keyframe) {
+  let nals;
+  try { nals = parseAnnexB(image); } catch { return false; }
+  const types = new Set(nals.map(nal => nal.type));
+  if (!nals.some(nal => nal.type >= 1 && nal.type <= 5)) return false;
+  return !keyframe || (types.has(7) && types.has(8) && types.has(5));
+}
+
+/** Bounded packet buffering; consumer completion gates each credit returned to the host. */
 export async function* decodeStream(readable) {
   let buffer = Buffer.alloc(0), header, headerBytes = 0, sequence = 0;
   for await (const chunk of readable) {
@@ -79,6 +109,11 @@ export async function* decodeStream(readable) {
           throw new Error('invalid_stream_frame');
         sequence = header.sequence;
       }
+      if (header.type === 'vframe') {
+        if (header.sequence <= sequence || !validVideoAccessUnit(image, header.keyframe))
+          throw new Error('invalid_stream_frame');
+        sequence = header.sequence;
+      }
       yield { header, image };
       header = undefined;
     }
@@ -91,17 +126,21 @@ const supervisor = (await readFile(new URL('./remote.py', import.meta.url), 'utf
   .replace('if __name__ == "__main__":\n    main()', '') + '\n' +
   await readFile(new URL('./stream-supervisor.py', import.meta.url), 'utf8');
 
-/** Transport seam for a future native sidebar; no UI or input API is implied. */
-export async function consumeHost(config, { lease, mode = 'stream', target = null, signal }, consume) {
+/**
+ * Media connection, separate from the control session so frames never delay input replies.
+ * Up to `window` packets are in flight; the host keeps only the latest capture while waiting.
+ */
+export async function consumeHost(config, { lease, mode = 'stream', target = null, signal, window = STREAM_WINDOW }, consume) {
   config = configSchema.parse(config);
-  if (config.transport !== 'factory') throw new Error('factory_transport_required');
   lease = proofSchema.parse(lease);
-  mode = z.enum(['diagnose', 'windows', 'stream']).parse(mode);
-  target = mode === 'stream' ? streamTargetSchema.parse(target) : z.null().parse(target);
+  window = z.number().int().min(1).max(8).parse(window);
+  mode = z.enum(['diagnose', 'windows', 'stream', 'recording']).parse(mode);
+  target = mode === 'recording' ? desktopTargetSchema.parse(target)
+    : mode === 'stream' ? streamTargetSchema.parse(target) : z.null().parse(target);
   if (signal?.aborted) throw new Error('stream_cancelled');
-  const child = spawn('droid', ['computer', 'ssh', config.computer, '--', `/usr/bin/python3 -c ${quote(supervisor)}`],
-    { stdio: ['pipe', 'pipe', 'pipe'], detached: true });
-  let stderrBytes = 0, stderr = '', failure, frames = 0, packets = 0, terminal = false;
+  const [executable, transportArgs] = transportCommand(config, supervisor);
+  const child = spawn(executable, transportArgs, { stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+  let stderrBytes = 0, stderr = '', failure, frames = 0, video = 0, packets = 0, terminal = false;
   const stop = () => {
     if (child.pid) { try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { if (e.code !== 'ESRCH') throw e; } }
   };
@@ -125,20 +164,20 @@ export async function consumeHost(config, { lease, mode = 'stream', target = nul
   process.once('SIGTERM', cancel);
   const timer = setTimeout(() => { failure = new Error('stream_timeout'); stop(); }, (config.timeoutSeconds + 15) * 1000);
   child.stdin.write(JSON.stringify({ owner: config.owner, workspace: config.workspace, args: { lease },
-    mode, target, timeout: config.timeoutSeconds }) + '\n');
+    mode, target, timeout: config.timeoutSeconds, window }) + '\n');
   try {
     for await (const packet of decodeStream(child.stdout)) {
       const kind = packet.header.type;
       if (terminal || (kind !== 'diagnostic' && !(
-        (mode === 'windows' && kind === 'windows') || (mode === 'stream' && ['frame', 'heartbeat'].includes(kind))
+        (mode === 'windows' && kind === 'windows') || (['stream', 'recording'].includes(mode) && ['frame', 'vframe', 'heartbeat'].includes(kind))
       ))) throw new Error('invalid_stream_response');
       packets++;
       terminal = ['diagnostic', 'windows'].includes(kind);
-      if (packet.header.type === 'frame') {
+      if (['frame', 'vframe'].includes(packet.header.type)) {
         if (!sameTarget(packet.header, target)) throw new Error('stream_target_mismatch');
-        frames++;
+        if (packet.header.type === 'frame') frames++; else video++;
       }
-      const streaming = ['frame', 'heartbeat'].includes(packet.header.type);
+      const streaming = ['frame', 'vframe', 'heartbeat'].includes(packet.header.type);
       await new Promise((resolve, reject) => {
         const finish = error => {
           clearTimeout(deadline);
@@ -158,7 +197,7 @@ export async function consumeHost(config, { lease, mode = 'stream', target = nul
     if (failure) throw failure;
     if (code !== 0) throw new Error('stream_terminated');
     if (!packets) throw new Error('empty_stream');
-    return { frames };
+    return { frames, video };
   } catch (error) {
     throw failure ?? error;
   } finally {

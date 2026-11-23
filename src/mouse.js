@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const coordinate = z.number().finite().min(0).lt(1);
 const point = { x: coordinate, y: coordinate };
+export const isBackgroundClick = mouse => mouse?.kind === 'click' && mouse.button === 'left' && mouse.count === 1;
 export const mouseSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('move'), ...point }),
   z.strictObject({ kind: z.literal('click'), ...point, button: z.enum(['left', 'right']),

@@ -76,6 +76,7 @@
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 PRODUCT_BUNDLE_IDENTIFIER = com.factory.applets.RelayMac;
                 GENERATE_INFOPLIST_FILE = YES;
+                ENABLE_DEBUG_DYLIB = NO;
                 INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
                 CURRENT_PROJECT_VERSION = 1;

@@ -28,8 +28,8 @@ test('static contract: setup is explicit and returns before the normal session s
   assert.match(setup, /setActivationPolicy\(\.regular\)/);
   assert.match(setup, /permissionSetup = controller/);
   assert.match(setup, /controller\.showSetup\(\)\s+return/);
-  assert.ok(launch.indexOf('return') < launch.indexOf('await HostSession.run()'));
-  assert.doesNotMatch(setup, /HostSession\.run|CGRequest|AXIsProcessTrustedWithOptions/);
+  assert.ok(launch.indexOf('return') < launch.indexOf('HostServer.start('));
+  assert.doesNotMatch(setup, /HostServer\.start|CGRequest|AXIsProcessTrustedWithOptions/);
   assert.match(lifecycle, /private var permissionSetup: PermissionSetupController\?/);
   assert.match(lifecycle, /withExtendedLifetime\(delegate\)/);
   assert.match(lifecycle, /enum AppletsHost/);

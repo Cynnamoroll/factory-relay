@@ -2,6 +2,7 @@ import { summarize, failure } from './qa-contract.js';
 import { qaEditPlan } from '../web/qa-edit.js';
 import { selectApplication } from './qa-applications.js';
 import { sampleBundle, isDesktop, sameTarget, targetIdentity, sameDisplayConfiguration } from './window-target.js';
+import { recordingName } from '../web/recording-name.js';
 
 function owner(broker, actor, runId) {
   if (broker.current()?.id !== runId) throw new Error('run_mismatch');
@@ -24,7 +25,7 @@ export function report(broker, id) {
     ...c, replayUrl: url(broker, id, c.stepId), clip: edit.clips.find(clip => clip.stepId === c.stepId) ?? null,
   }));
   const artifacts = exported.status === 'ready' ? Object.fromEntries(
-    ['qa-v3-recording.mp4', 'qa-v3-poster.jpg', 'qa-v3-summary.json'].map(name => [name, broker.exports.artifact(id, name).file])) : {};
+    ['qa-v5-recording.mp4', 'qa-v5-poster.jpg', 'qa-v5-summary.json'].map(name => [name, broker.exports.artifact(id, name).file])) : {};
   const sourceExport = broker.exports.state(id);
   const sourceArtifact = sourceExport.status === 'ready' ? broker.exports.artifact(id, 'recording.mp4').file : null;
   const replayUrl = url(broker, id, first?.stepId);
@@ -32,11 +33,11 @@ export function report(broker, id) {
     ...checks.slice(0, 20).map(c => `- [${markdownText(c.title)}](${c.replayUrl}): **${c.status}**; expected ${markdownText(c.expected)}, observed ${markdownText(c.actual ?? 'unavailable')}.${c.kind === 'visual' ? ` Visual assessment by ${c.assessment.actor}; not server-verified.` : ''}${c.context ? ' ' + markdownText(c.context) : ''}${c.clip ? ` Source ${(c.clip.sourceStartMs / 1000).toFixed(3)}–${(c.clip.sourceEndMs / 1000).toFixed(3)}s; QA video ${(c.clip.startMs / 1000).toFixed(3)}–${(c.clip.endMs / 1000).toFixed(3)}s.` : ' No QA clip.'}`),
     ...(summary.checks.length > 20 ? [`Showing ${Math.min(20, summary.checks.length)} of ${summary.checks.length} checks, non-passing first. Use paginated qa_replay for all results.`] : []),
     `[Open QA review](${replayUrl})`];
-  if (artifacts['qa-v3-recording.mp4']) lines.push(`[![QA recording preview](${artifacts['qa-v3-poster.jpg']})](${replayUrl})`,
-    `[Download QA video](${artifacts['qa-v3-recording.mp4']}) · [QA edit provenance](${artifacts['qa-v3-summary.json']})`);
+  if (artifacts['qa-v5-recording.mp4']) lines.push(`[![QA recording preview](${artifacts['qa-v5-poster.jpg']})](${replayUrl})`,
+    `[Download QA video](${artifacts['qa-v5-recording.mp4']}) · [QA edit provenance](${artifacts['qa-v5-summary.json']})`);
   else lines.push(`QA video export: ${exported.status}. ${edit.available && !edit.clips.length ? 'No completed passing or failing QA checks.' : !edit.available ? edit.reason : 'Prepare with qa_report.'}`);
   if (sourceArtifact) lines.push(`[Full session evidence, separate from QA video](${sourceArtifact})`);
-  lines.push(`QA video contains only recorded evidence for passing and failing checks: ${(edit.durationMs / 1000).toFixed(3)}s edited; ${(edit.evidenceMs / 1000).toFixed(3)}s evidence from ${(summary.durationMs / 1000).toFixed(3)}s source. Only conservatively associated preceding input is included as context, not causal proof. Setup, ownership transitions and idle between operations are omitted. Missing footage inside QA is marked.`,
+  lines.push(`QA review: ${(edit.durationMs / 1000).toFixed(3)}s playback, including ${(edit.presentationMs / 1000).toFixed(3)}s of review pauses and ${(edit.evidenceMs / 1000).toFixed(3)}s of evidence from ${(summary.durationMs / 1000).toFixed(3)}s source. Pauses hold recorded frames; they are not continued capture. The webpage identifies pauses outside the video; no text is burned into the MP4. Each check has at least eight seconds at 1× speed. Only conservatively associated preceding input is included as context, not causal proof. Setup, ownership transitions and idle between operations are omitted. Missing footage remains blank and is identified in provenance.`,
     'All checks and operational errors remain in Results JSON. Labels and intentional-test descriptions are caller supplied. Local replay requires an authenticated browser. No inline chat-player claim.');
   const { checks: _, ...overview } = summary;
   return { ...overview, checks, checksTruncated: summary.checks.length > checks.length, replayUrl, edit,
@@ -63,8 +64,9 @@ export async function readTask(broker, name, args) {
         (['blocked', 'uncertain', 'interrupted'].includes(e.status) || e.kind === 'step-end' && e.status === 'fail'))
         .map(e => ({ kind: e.kind, elapsedMs: e.elapsedMs, status: e.status, reason: e.reason ?? null,
           ...(e.stepId ? { stepId: e.stepId } : {}), ...(e.operation ? { operation: e.operation } : {}) }));
-      return { runId: summary.runId, title: summary.title, context: summary.context, status: summary.status,
+      return { runId: summary.runId, ...recordingName(run.events), context: summary.context, status: summary.status,
         reason: summary.reason ?? null, counts: summary.counts, sourceDurationMs: summary.durationMs,
+        recordingScope: summary.recordingScope, recordingContextFrames: summary.recordingContextFrames,
         checks: { total: summary.checks.length, offset: args.offset, items: summary.checks.slice(args.offset, args.offset + args.limit)
           .map(({ observationId, ...check }) => check) },
         operationalErrors: { total: errors.length, offset: args.offset, items: errors.slice(args.offset, args.offset + args.limit) },
@@ -72,7 +74,7 @@ export async function readTask(broker, name, args) {
     }
     const edit = qaEditPlan(run.events, summary.durationMs);
     const rows = args.filter === 'checks' ? summary.checks : args.filter === 'failures'
-      ? summary.checks.filter(c => c.status !== 'pass') : run.events.filter(e => args.filter !== 'frames' || e.kind === 'frame');
+      ? summary.checks.filter(c => c.status !== 'pass') : run.events.filter(e => e.kind !== 'recording-frame' && (args.filter !== 'frames' || e.kind === 'frame'));
     const { checks, ...overview } = summary;
     return { ...overview, total: rows.length, offset: args.offset,
       nextOffset: args.offset + args.limit < rows.length ? args.offset + args.limit : null,
@@ -90,7 +92,7 @@ export async function executeTask(broker, actor, name, args) {
   if (name === 'qa_targets') {
     const found = await broker.discover();
     return { displays: found.filter(isDesktop), windows: found.filter(t => !isDesktop(t)), discoveredAt: Date.now(),
-      input: 'Desktop mouse covers all visible content on one selected display. Restricted windows must be foreground and unobscured at the input point.' };
+      input: 'Desktop mouse covers visible content on the selected display. Restricted windows use background accessibility actions and refuse unsupported input.' };
   }
   if (name === 'qa_start') {
     const active = broker.current();
@@ -108,7 +110,7 @@ export async function executeTask(broker, actor, name, args) {
         if (current.snapshot.processStartedAt !== startedAt)
           throw new Error('target_mismatch');
       }
-      return { runId: active.id, ...selectedApplication, resumed: true, controller: actor, target: broker.target, replayUrl: url(broker, active.id), nextAction: 'qa_observe' };
+      return { runId: active.id, ...recordingName(active.events), ...selectedApplication, resumed: true, controller: actor, target: broker.target, replayUrl: url(broker, active.id), nextAction: 'qa_observe' };
     }
     if (args.resumeRunId) throw new Error('run_not_active');
     if (broker.owner && broker.owner.actor !== actor) throw new Error('human_takeover_required');
@@ -119,6 +121,7 @@ export async function executeTask(broker, actor, name, args) {
       if (!discovered || !isDesktop(discovered) && !Number.isFinite(discovered.processStartedAt) || !broker.discoveredAt ||
           Date.now() - broker.discoveredAt > 30000) throw new Error('target_discovery_required');
     }
+    if (broker.recordingContext.key === broker) await broker.recordingContext.population.reserve(broker);
     try {
       if (!broker.owner) {
         await broker.execute(actor, { op: 'connect' });
@@ -150,9 +153,10 @@ export async function executeTask(broker, actor, name, args) {
       }
       if (!await broker.waitFrame(0, 15000)) throw new Error('live_frame_required');
       const { runId } = await broker.execute(actor, { op: 'start', grant: broker.owner.grant,
-        labels: { title: args.title, applicationId: application.id, ...(args.context ? { context: args.context } : {}) } });
+        labels: { ...(args.title ? { title: args.title } : {}), applicationId: application.id, ...(args.context ? { context: args.context } : {}) } });
       broker.owner.runId = runId;
-      return { runId, ...selectedApplication, resumed: false, controller: actor, target: broker.target, replayUrl: url(broker, runId),
+      return { runId, ...recordingName(broker.store.get(runId).events), ...selectedApplication, resumed: false, controller: actor, target: broker.target, replayUrl: url(broker, runId),
+        recordingScope: broker.recordingContext.status(),
         recording: { cadence: '5 Hz background sampling plus action evidence', maxDurationSeconds: 600, gaps: 'explicitly marked' }, nextAction: 'qa_observe' };
     } catch (error) {
       if (!hadOwner && !broker.current()) {
@@ -164,6 +168,8 @@ export async function executeTask(broker, actor, name, args) {
           catch { broker.error = 'release_unconfirmed'; }
         }
       }
+      if (!broker.current() && !broker.lease && broker.recordingContext.key === broker)
+        await broker.recordingContext.population.release(broker);
       throw error;
     }
   }
@@ -192,6 +198,7 @@ export async function executeTask(broker, actor, name, args) {
         try { await broker.native.release(lease); }
         catch { broker.error = 'release_unconfirmed'; }
       }
+      if (broker.recordingContext.key === broker) await broker.recordingContext.population.release(broker);
     }
     try { broker.exports.request(args.runId, false, 'qa'); }
     catch (e) { return { ...report(broker, args.runId), exportError: failure(e, 'qa_report', actor) }; }
@@ -214,9 +221,10 @@ export async function executeTask(broker, actor, name, args) {
   }
   if (name === 'qa_act') {
     const result = await broker.execute(actor, { op: args.action === 'mouse' ? 'mouse' : 'press', grant,
-      observationId: args.observationId, ...(args.action === 'mouse' ? { mouse: args.mouse } : {}) });
+      observationId: args.observationId, completion: args.completion, waitFor: args.waitFor,
+      ...(args.action === 'mouse' ? { mouse: args.mouse } : {}) });
     return { runId: args.runId, ...result,
-      ...(args.action === 'mouse' ? { image: image(broker, broker.observation.frame) } : {}) };
+      ...(args.action === 'mouse' && !args.completion && !args.waitFor ? { image: image(broker, broker.observation.frame) } : {}) };
   }
   if (name === 'qa_check') {
     const check = await broker.execute(actor, { op: args.kind === 'visual' ? 'assert-visual' : 'assert-count',

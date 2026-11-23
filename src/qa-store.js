@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { recordingName } from '../web/recording-name.js';
 
 export const opaque = () => randomBytes(16).toString('hex');
 export const isId = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
@@ -87,6 +88,7 @@ export class RunStore {
     this.runs = new Map();
     this.deletions = new Map();
     this.totalBytes = 0;
+    this.maxPendingWrites = 2;
     fs.mkdirSync(root, { recursive: true, mode: 0o700 });
     privateEntry(root, true);
     this.lock = path.join(root, 'writer.lock');
@@ -108,7 +110,7 @@ export class RunStore {
         if (match[2] === 'tmp') { fs.unlinkSync(file); continue; }
         const intent = JSON.parse(fs.readFileSync(file, 'utf8'));
         if (intent.version !== 1 || intent.id !== match[1] || typeof intent.title !== 'string' ||
-            intent.title.length > 200 || !Number.isFinite(intent.started) ||
+            intent.title.length > 600 || !Number.isFinite(intent.started) ||
             !Object.hasOwn(intent, 'exports')) throw new Error('unsafe_deletion_intent');
         validateSnapshot(intent.source, sourceName);
         if (!intent.source) throw new Error('unsafe_deletion_intent');
@@ -143,7 +145,7 @@ export class RunStore {
             events.length > policy.maxEvents + 1 ||
             events.some((e, i) => e.seq !== i + 1 || e.runId !== id)) throw new Error('invalid_qa_journal');
         const run = { id, dir, dirIdentity, file, events, bytes, journalBytes: end, started: events[0]?.at ?? Date.now(),
-          frames: events.filter(e => e.kind === 'frame').length, lastSample: 0 };
+          frames: events.filter(e => ['frame', 'recording-frame'].includes(e.kind)).length, lastSample: 0 };
         this.runs.set(id, run);
         if (end !== raw.length) {
           fs.truncateSync(file, end);
@@ -196,12 +198,65 @@ export class RunStore {
       policy: this.policy, recording: '5 Hz background sampling plus action evidence; elapsed-time MP4; unknown gaps explicitly marked' });
     return run;
   }
+  /** Synchronous durable frame; offline fixtures and tools use it. Live capture uses frameAsync. */
   frame(run, packet, force = false) {
+    const plan = this.reserveFrame(run, packet, force);
+    if (!plan?.file) return plan?.event ?? null;
+    try {
+      const fd = fs.openSync(plan.file, 'wx', 0o600);
+      try { fs.writeFileSync(fd, packet.image); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    } catch { this.fault = true; throw new Error('recording_error'); }
+    return this.commitFrame(run, packet, plan);
+  }
+  /**
+   * Image write and fsync happen off the capture callback. Background samples are dropped
+   * rather than queued beyond maxPendingWrites; forced evidence frames are awaited by callers.
+   */
+  frameAsync(run, packet, force = false, { kind = 'frame', valid = () => true } = {}) {
+    const state = kind === 'frame' ? run : (run.recordingState ??= { lastSample: -Infinity });
+    if (packet.version !== undefined && packet.version === state.lastVersion && state.lastFrameWork) return state.lastFrameWork;
+    if (!force && (run.pendingWrites ?? 0) >= this.maxPendingWrites) { run.droppedSamples = (run.droppedSamples ?? 0) + 1; return Promise.resolve(null); }
+    let plan;
+    try { plan = this.reserveFrame(run, packet, force, state); } catch (e) { return Promise.reject(e); }
+    if (!plan?.file) return Promise.resolve(plan?.event ?? null);
+    run.pendingWrites = (run.pendingWrites ?? 0) + 1;
+    const work = (async () => {
+      try {
+        const handle = await fs.promises.open(plan.file, 'wx', 0o600);
+        try { await handle.writeFile(packet.image); await handle.sync(); } finally { await handle.close(); }
+      } catch { this.fault = true; throw new Error('recording_error'); }
+      finally { run.pendingWrites--; }
+      if (!valid() || run.events.at(-1)?.kind === 'run-end') { this.revertFrame(run, plan); return null; }
+      return this.commitFrame(run, packet, plan, kind, state);
+    })();
+    state.lastFrameWork = work;
+    run.writes = (run.writes ?? Promise.resolve()).then(() => work.catch(() => {}));
+    return work;
+  }
+  /** Resolves once every queued frame write for the run has completed or failed. */
+  async flush(run) {
+    await run.writes;
+    if (this.fault) throw new Error('recording_error');
+  }
+  revertFrame(run, plan) {
+    try { fs.unlinkSync(plan.file); } catch {}
+    run.bytes -= plan.bytes; this.totalBytes -= plan.bytes; run.frames--;
+  }
+  commitFrame(run, packet, plan, kind = 'frame', state = run) {
+    state.lastFrame = this.append(run, { kind, actor: 'broker', frameId: plan.frameId,
+      sha256: createHash('sha256').update(packet.image).digest('hex'),
+      bytes: packet.image.length, header: packet.header,
+      ...(kind === 'recording-frame' ? { recording: packet.recording } : {}),
+      brokerFrameVersion: packet.version, receivedAt: packet.receivedAt,
+      receivedElapsedMs: packet.receivedMono === undefined ? this.elapsed(run) : Math.max(0, packet.receivedMono - run.monoStart) });
+    return state.lastFrame;
+  }
+  reserveFrame(run, packet, force, state = run) {
     if (this.fault) throw new Error('recording_error');
     if (run.limitReached) return null;
-    if (packet.version !== undefined && packet.version === run.lastVersion) return run.lastFrame;
+    if (packet.version !== undefined && packet.version === state.lastVersion) return { event: state.lastFrame };
     const now = performance.now();
-    if (!force && now - run.lastSample < this.policy.sampleMs) return null;
+    if (!force && now - state.lastSample < this.policy.sampleMs) return null;
     if (run.frames >= this.policy.maxFrames || packet.image.length > this.policy.maxImageBytes ||
         this.elapsed(run) >= this.policy.maxDurationMs ||
         run.events.length >= this.policy.maxEvents - 12 ||
@@ -219,21 +274,13 @@ export class RunStore {
       throw new Error('recording_full');
     }
     const frameId = opaque();
-    try {
-      const fd = fs.openSync(path.join(run.dir, frameId + '.jpg'), 'wx', 0o600);
-      try { fs.writeFileSync(fd, packet.image); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
-    } catch { this.fault = true; throw new Error('recording_error'); }
     run.bytes += packet.image.length;
     this.totalBytes += packet.image.length;
     run.frames++;
-    run.lastSample = now;
-    run.lastVersion = packet.version;
-    run.lastFrame = this.append(run, { kind: 'frame', actor: 'broker', frameId,
-      sha256: createHash('sha256').update(packet.image).digest('hex'),
-      bytes: packet.image.length, header: packet.header,
-      brokerFrameVersion: packet.version, receivedAt: packet.receivedAt,
-      receivedElapsedMs: packet.receivedMono === undefined ? this.elapsed(run) : Math.max(0, packet.receivedMono - run.monoStart) });
-    return run.lastFrame;
+    state.lastSample = now;
+    state.lastVersion = packet.version;
+    state.lastFrameWork = null;
+    return { frameId, file: path.join(run.dir, frameId + '.jpg'), bytes: packet.image.length };
   }
   elapsed(run) {
     return Math.max(run.events.at(-1)?.elapsedMs ?? 0, run.monoStart === undefined ? 0 : performance.now() - run.monoStart);
@@ -264,12 +311,15 @@ export class RunStore {
   }
   history() {
     return [...this.runs.values()].filter(r => !this.deletions.has(r.id)).reverse().map(r => ({ runId: r.id, started: r.started,
-      target: r.events[0]?.target ?? null, labels: r.events[0]?.labels ?? {}, events: r.events.length,
+      target: r.events[0]?.target ?? null, ...recordingName(r.events),
+      labels: { ...r.events[0]?.labels, title: recordingName(r.events).title }, events: r.events.length,
       status: r.events.at(-1)?.kind === 'run-end' ? r.events.at(-1).status : this.fault ? 'blocked' : 'running' }));
   }
-  image(id, frameId) {
+  image(id, frameId) { return this.readImage(id, frameId, 'frame'); }
+  recordingImage(id, frameId) { return this.readImage(id, frameId, 'recording-frame'); }
+  readImage(id, frameId, kind) {
     const r = this.get(id);
-    if (!isId(frameId) || !r.events.some(e => e.kind === 'frame' && e.frameId === frameId))
+    if (!isId(frameId) || !r.events.some(e => e.kind === kind && e.frameId === frameId))
       throw new Error('frame_not_found');
     const file = path.join(r.dir, frameId + '.jpg');
     if (privateEntry(file).size > this.policy.maxImageBytes) throw new Error('invalid_frame');
@@ -281,7 +331,7 @@ export class RunStore {
       const run = this.get(id);
       if (run.inflight || run.events.at(-1)?.kind !== 'run-end') throw new Error('run_active');
       exporter.requireIdle(id);
-      intent = { version: 1, id, title: String(run.events[0]?.labels?.title ?? 'QA run').slice(0, 200),
+      intent = { version: 1, id, title: recordingName(run.events).title,
         started: run.started, source: ownedFiles(this.root, id, sourceName), exports: exporter.deletionFiles(id) };
       if (!sameFile(intent.source, run.dirIdentity)) throw new Error('unsafe_deletion_storage');
       const temporary = path.join(this.root, `delete-${id}.tmp`);

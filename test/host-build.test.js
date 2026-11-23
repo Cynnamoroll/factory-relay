@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { hostBuildSource, hostSourceNames } from '../scripts/build-host.js';
 
 test('legacy host migration backs up the old app, refuses busy or implicit upgrades, and preserves failed builds', () => {
-  assert.deepEqual(hostSourceNames, ['AppletsHost.swift', 'HostLifecycle.swift', 'AppletsControl.swift', 'Info.plist']);
+  assert.deepEqual(hostSourceNames, ['AppletsHost.swift', 'HostLifecycle.swift', 'AppletsControl.swift', 'Info.plist', 'AppIcon.icns']);
   const harness = `
 import contextlib,hashlib,io,json,pathlib,subprocess,sys,tempfile,time,zipfile
 from unittest.mock import patch
@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory() as temporary:
                 for p in root.rglob("*") if p.is_file() and p!=manifest and p!=root/".DS_Store"}
     manifest.write_text(json.dumps(snapshot()))
     (root/".DS_Store").write_text("Finder metadata belongs to the user")
-    files={"AppletsHost.swift":"new capture source","HostLifecycle.swift":"new AppKit lifecycle source","AppletsControl.swift":"new AX source","Info.plist":"new plist"}
+    files={"AppletsHost.swift":"new capture source","HostLifecycle.swift":"new AppKit lifecycle source","AppletsControl.swift":"new AX source","Info.plist":"new plist","AppIcon.icns":"aWNucwAAAAg="}
     legacy=workspace/".applets-native-control/Applets Control.app/Contents/MacOS/AppletsControl"
     legacy.parent.mkdir(parents=True)
     legacy.write_bytes(b"legacy rollback")
@@ -101,6 +101,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert result["bundleId"]=="com.factory.applets.host"
     assert result["packagedExecutables"]==["AppletsHost"]
     assert (new_app/"Contents/MacOS/AppletsHost").read_bytes()==b"compiled test executable"
+    assert (new_app/"Contents/Resources/AppIcon.icns").read_bytes()==b"icns\\x00\\x00\\x00\\x08", "the rendered icon is bundled byte for byte"
     assert not app.exists(), "successful migration must replace the legacy app, not leave a second launch target"
     backups=list(workspace.glob(".applets-host-backup-*.zip"))
     assert len(backups)==1

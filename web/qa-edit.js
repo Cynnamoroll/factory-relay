@@ -1,20 +1,33 @@
 import { sameTarget as targetEquals, isDesktop, sameSnapshotIdentity } from './target-identity.js';
 
-export const QA_EDIT_VERSION = 3;
+export const QA_EDIT_VERSION = 5;
 export const QA_EDIT_POLICY = Object.freeze({ maxEvents: 12001, maxClips: 256, maxSegments: 12001,
-  maxDurationMs: 690000, maxEditedDurationMs: 690000 });
+  maxDurationMs: 690000, maxEditedDurationMs: 690000,
+  reviewPauses: true, openingHoldMs: 2000, minClipMs: 8000,
+  minResultHoldMs: 4000, maxResultHoldMs: 20000, readingWordsPerSecond: 3,
+  maxReviewDurationMs: 690000 + 256 * (2000 + 20000) });
 const kinds = new Set(['run-start', 'run-end', 'frame', 'gap', 'ownership', 'step-start', 'step-end',
-  'action-attempt', 'action', 'observation', 'assertion', 'recording-limit']);
+  'action-attempt', 'action', 'observation', 'assertion', 'recording-limit', 'recording-frame', 'recording-scope']);
 const id = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
 const text = (value, limit) => String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, limit);
 
 function precedingInput(events, checkStart, assertion, starts, frames) {
-  const index = events.indexOf(checkStart), previous = events.slice(0, index).findLast(e => e.kind !== 'frame');
+  const index = events.indexOf(checkStart);
+  const context = events.slice(0, index).filter(e => !['frame', 'recording-frame', 'recording-scope'].includes(e.kind)), skipped = [];
+  while (context.at(-1)?.kind === 'step-end' && starts.get(context.at(-1).stepId)?.operation === 'observe') {
+    const end = context.pop(), observed = context.pop(), begin = context.pop();
+    if (end.status !== 'pass' || begin?.kind !== 'step-start' || begin.operation !== 'observe' ||
+        observed?.kind !== 'observation' || [observed, end].some(e => e.stepId !== begin.stepId) ||
+        [begin, observed, end].some(e => e.actor !== checkStart.actor || e.actionId !== undefined)) return null;
+    skipped.push(observed);
+  }
+  const previous = context.at(-1);
   if (previous?.kind !== 'step-end' || previous.status !== 'pass') return null;
   const start = starts.get(previous.stepId);
   if (!start || !['press', 'mouse'].includes(start.operation) || !id(start.actionId) || !['agent', 'human'].includes(start.actor) ||
       [previous, checkStart, assertion].some(e => e.actor !== start.actor)) return null;
-  const rows = events.slice(events.indexOf(start), index).filter(e => e.kind !== 'frame');
+  if (checkStart.elapsedMs - start.elapsedMs > 30000) return null;
+  const rows = events.slice(events.indexOf(start), events.indexOf(previous) + 1).filter(e => !['frame', 'recording-frame', 'recording-scope'].includes(e.kind));
   if (events.some(e => e.actionId === start.actionId && e.stepId !== start.stepId)) return null;
   if (rows.some(e => e.stepId !== start.stepId || e.actor !== start.actor || e.actionId !== start.actionId)) return null;
   if (rows.map(e => e.kind).join(',') !== 'step-start,action-attempt,action,observation,step-end') return null;
@@ -23,6 +36,10 @@ function precedingInput(events, checkStart, assertion, starts, frames) {
   const checkObservations = events.filter(e => e.kind === 'observation' && e.stepId === checkStart.stepId && e.observationId === assertion.observationId);
   if (beforeObservations.length !== 1 || checkObservations.length !== 1) return null;
   const [beforeObservation] = beforeObservations, [checkObservation] = checkObservations;
+  const matchingLayout = snapshot => sameSnapshotIdentity(observed.snapshot, snapshot) &&
+    (isDesktop(snapshot?.target) || JSON.stringify(snapshot?.windowRectPoints) === JSON.stringify(observed.snapshot?.windowRectPoints));
+  if (skipped.some(e => !matchingLayout(e.snapshot) || e.frameEvidence?.status !== 'available' ||
+      !frames.has(e.afterFrameId)) || !matchingLayout(beforeObservation.snapshot) || !matchingLayout(checkObservation.snapshot)) return null;
   if (attempt.status !== 'running' || ack.status !== 'pass' || ack.reason !== 'input_acknowledged_requires_assertion' ||
       ack.observationId !== attempt.observationId || checkObservation.elapsedMs < checkStart.elapsedMs ||
       checkObservation.elapsedMs > assertion.elapsedMs || checkObservation.actual !== assertion.actual ||
@@ -45,7 +62,7 @@ function precedingInput(events, checkStart, assertion, starts, frames) {
 }
 
 /** Only associated input and assertion intervals contribute playback time. */
-export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
+function evidencePlan(events, sourceDurationMs, policy) {
   const unavailable = reason => ({ version: QA_EDIT_VERSION, available: false, reason, sourceDurationMs, durationMs: 0, clips: [], segments: [] });
   if (!Array.isArray(events) || events.length < 2 || events.length > policy.maxEvents ||
       !Number.isFinite(sourceDurationMs) || sourceDurationMs <= 0 || sourceDurationMs > policy.maxDurationMs ||
@@ -87,7 +104,7 @@ export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
     if (events.some(row => row.elapsedMs >= start.elapsedMs && row.elapsedMs < e.elapsedMs &&
         (row.kind === 'ownership' || ['step-start', 'action-attempt', 'action', 'observation'].includes(row.kind) && row.stepId !== e.stepId)))
       return unavailable('Unrelated operations overlap a QA interval; QA video unavailable.');
-    let input = precedingInput(events, start, e, starts, frames);
+    let input = start.inputOperation ? null : precedingInput(events, start, e, starts, frames);
     let assessed;
     if (visual) {
       const checkObservation = events.find(row => row.kind === 'observation' && row.seq === e.observationSeq && row.stepId === e.stepId);
@@ -117,7 +134,8 @@ export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
       context: text(e.context ?? start.context, 600), expected: e.expected ?? null, actual: e.actual ?? null,
       ...(visual ? { kind: 'visual', assessment: e.assessment, frameId: e.afterFrameId } : {}),
       sourceStartMs: start.elapsedMs, sourceEndMs: e.elapsedMs, startMs: durationMs,
-      evidenceNote: input ? 'Preceding recorded input; context, not proof of causation.' : 'Assertion observation only; no associated input.' };
+      evidenceNote: start.inputOperation ? 'Single input and device-local count check; AX readback is assertion evidence.'
+        : input ? 'Preceding recorded input; context, not proof of causation.' : 'Assertion observation only; no associated input.' };
     const add = (kind, ms, fields) => {
       segments.push({ kind, stepId: e.stepId, startMs: durationMs, endMs: durationMs + ms, ...fields });
       durationMs += ms;
@@ -135,6 +153,42 @@ export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
   }
   return { version: QA_EDIT_VERSION, available: true, sourceDurationMs, durationMs, evidenceMs,
     presentationMs: durationMs - evidenceMs, omittedMs: sourceDurationMs - evidenceMs, clips, segments };
+}
+/** Review pauses hold authentic frames; they never extend source evidence time. */
+export function qaEditPlan(events, sourceDurationMs, policy = QA_EDIT_POLICY) {
+  const plan = evidencePlan(events, sourceDurationMs, policy);
+  if (!plan.available || !policy.reviewPauses) return plan;
+  const clips = [], segments = [];
+  let durationMs = 0;
+  for (const clip of plan.clips) {
+    const original = plan.segments.filter(s => s.stepId === clip.stepId);
+    const evidenceMs = clip.endMs - clip.startMs;
+    // Three words/second is a reading allowance, not a capture or application speed.
+    const words = [clip.title, clip.expected, clip.actual].join(' ').trim().split(/\s+/u).length;
+    const resultMs = Math.max(policy.minResultHoldMs,
+      Math.min(policy.maxResultHoldMs, Math.ceil(words / policy.readingWordsPerSecond * 1000)),
+      policy.minClipMs - policy.openingHoldMs - evidenceMs);
+    const startMs = durationMs;
+    const hold = (role, ms) => {
+      segments.push({ kind: 'review-hold', role, stepId: clip.stepId, startMs: durationMs,
+        endMs: durationMs + ms, mapping: 'held-frame',
+        ...(role === 'result-review' && clip.frameId ? { frameId: clip.frameId } : {}),
+        title: clip.title, status: clip.status, assessment: clip.assessment,
+        expected: clip.expected, actual: clip.actual });
+      durationMs += ms;
+    };
+    hold('check-opening', policy.openingHoldMs);
+    for (const segment of original) {
+      const ms = segment.endMs - segment.startMs;
+      segments.push({ ...segment, startMs: durationMs, endMs: durationMs + ms });
+      durationMs += ms;
+    }
+    hold('result-review', resultMs);
+    clips.push({ ...clip, startMs, endMs: durationMs });
+  }
+  if (durationMs > policy.maxReviewDurationMs || segments.length > policy.maxSegments)
+    return { ...plan, available: false, reason: 'QA review exceeds presentation bounds.', durationMs: 0, clips: [], segments: [] };
+  return { ...plan, clips, segments, durationMs, presentationMs: durationMs - plan.evidenceMs };
 }
 export function qaClipAt(plan, editedMs) {
   if (!plan?.available || !Number.isFinite(editedMs)) return null;

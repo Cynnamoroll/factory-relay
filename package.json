@@ -9,6 +9,7 @@
   "license": "MIT",
   "scripts": {
     "test": "node --test",
+    "precheck": "node --check src/mac-session.js && node --check scripts/app-icon.js && node --check scripts/bench-mac.js && node --check scripts/build-host-candidate.js",
     "setup": "node scripts/setup.js",
     "setup:mac": "node scripts/setup-mac.js",
     "setup:test": "node --test test/setup.test.js test/setup-mac.test.js",
@@ -18,8 +19,9 @@
     "qa": "node src/qa.js",
     "qa:mcp": "node src/qa-mcp.js",
     "qa:open": "node scripts/qa-open.js",
-    "qa:check": "node --check src/window-target.js && node --check src/mouse.js && node --check src/qa-geometry.js && node --check src/qa-applications.js && node --check src/qa-store.js && node --check src/qa-broker.js && node --check src/qa-server.js && node --check src/qa.js && node --check src/qa-client.js && node --check src/qa-mcp.js && node --check src/qa-contract.js && node --check src/qa-tasks.js && node --check src/qa-export.js && node --check scripts/qa-open.js && node --check scripts/qa-acceptance.js && node --check scripts/qa-ui-fixture.js && node --check web/app.js && node --check web/qa-edit.js && node --check web/replay-entry.js && node --check web/target-identity.js",
-    "qa:test": "node --test test/qa-desktop.test.js test/qa-mouse.test.js test/qa-applications.test.js test/qa.test.js test/qa-export.test.js"
+    "preqa:check": "node --check web/recording-name.js && node --check src/qa-recording-context.js && node --check src/qa-managed-fixture.js && node --check src/qa-pane.js && node --check src/qa-window-session-contract.js && node --check src/qa-window-sessions.js && node --check src/qa-procedure.js && node --check scripts/bench-four-windows.js && python3 -c \"import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ['src/managed-fixture-supervisor.py','test/managed-fixture-supervisor.py']]\"",
+    "qa:check": "node --check src/window-target.js && node --check src/mouse.js && node --check src/qa-geometry.js && node --check src/qa-applications.js && node --check src/qa-store.js && node --check src/qa-broker.js && node --check src/qa-server.js && node --check src/qa.js && node --check src/qa-client.js && node --check src/qa-mcp.js && node --check src/qa-contract.js && node --check src/qa-tasks.js && node --check src/qa-export.js && node --check src/qa-cursor-export.js && node --check scripts/qa-open.js && node --check scripts/qa-acceptance.js && node --check scripts/qa-ui-fixture.js && node --check web/app.js && node --check web/live-video.js && node --check web/qa-edit.js && node --check web/action-cues.js && node --check web/replay-entry.js && node --check web/target-identity.js",
+    "qa:test": "node --test test/action-cues.test.js test/qa-desktop.test.js test/qa-mouse.test.js test/qa-applications.test.js test/qa.test.js test/qa-export.test.js test/qa-recording.test.js"
   },
   "keywords": [],
   "author": "",

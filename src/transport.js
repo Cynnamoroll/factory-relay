@@ -20,12 +20,11 @@ export async function loadConfig(file) {
   }
 }
 
-export function run(config, name, input) {
-  const args = parseOperation(name, input);
-  const request = JSON.stringify({ operation: name, args, owner: config.owner, workspace: config.workspace, timeout: config.timeoutSeconds });
-  const command = `/usr/bin/python3 -c ${quote(helper)}`;
-  const transportArgs = config.transport === 'factory'
-    ? ['computer', 'ssh', config.computer, '--', command] : [
+/** One argv shape for every remote helper, so Factory and own-host SSH stay interchangeable. */
+export function transportCommand(config, source) {
+  const command = `/usr/bin/python3 -c ${quote(source)}`;
+  if (config.transport === 'factory') return ['droid', ['computer', 'ssh', config.computer, '--', command]];
+  return ['ssh', [
     '-F', '/dev/null', '-T', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10', '-o', 'ConnectionAttempts=1', '-o', 'ServerAliveInterval=5',
     '-o', 'ServerAliveCountMax=2', '-o', 'ForwardAgent=no', '-o', 'ClearAllForwardings=yes',
@@ -33,9 +32,15 @@ export function run(config, name, input) {
     '-p', String(config.port), '-l', config.user,
     ...(config.identityFile ? ['-o', 'IdentitiesOnly=yes', '-i', config.identityFile] : []),
     '--', config.host, command,
-  ];
+  ]];
+}
+
+export function run(config, name, input) {
+  const args = parseOperation(name, input);
+  const request = JSON.stringify({ operation: name, args, owner: config.owner, workspace: config.workspace, timeout: config.timeoutSeconds });
+  const [executable, transportArgs] = transportCommand(config, helper);
   return new Promise((resolve, reject) => {
-    const child = spawn(config.transport === 'factory' ? 'droid' : 'ssh', transportArgs,
+    const child = spawn(executable, transportArgs,
       { stdio: ['pipe', 'pipe', 'pipe'], detached: true });
     let size = 0, output = [], failure;
     const killGroup = () => {
@@ -84,7 +89,7 @@ const WARNING_CODES = new Set(['apple_package_authorization_required', 'remote_s
   'apple_simulator_framework_incompatible', 'apple_coredevice_framework_incompatible']);
 
 const ERROR_CODES = new Set([
-  'busy', 'lease_held', 'stale_lease', 'lease_expired', 'command_failed', 'command_timeout',
+  'busy', 'lease_held', 'stale_lease', 'lease_expired', 'lease_scope', 'command_failed', 'command_timeout',
   'command_output_limit', 'invalid_remote_output', 'unsafe_state', 'invalid_request',
   'workspace_unavailable', 'internal_error',
   'command_interrupted',

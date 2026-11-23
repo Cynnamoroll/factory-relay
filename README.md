@@ -1,12 +1,97 @@
 # factory-relay
 
 Shared Mac desktop QA in Factory's embedded browser, with named checks and recordings.
-One selected display captures all visible apps, menus, sheets, Dock and menu bar.
-Generic mouse move, left/right click, double-click, drag and scroll use the same
-approved Factory Relay host. Restricted window mode and the RelayMac count API
-remain available. All selected-display content is private local evidence; review
-it before sharing.
+Live follows authorized test windows, never the whole display by default. With
+several runs, select a window to watch while the others show previews. Finished
+results are available immediately. Live moves to review after the last tracked
+recording ends. Manual replay links still open the requested recording or check.
+Window input uses background accessibility actions. Explicit whole-display QA
+uses an exclusive lease and foreground mouse input; its recordings can contain
+private content from any visible app.
 **iOS input and keyboard/type input are not supported by this slice.**
+
+### Recording scope is not input scope
+
+A sole active window session records the entire physical display with the
+largest overlap with its selected window. This is the default when the backend
+supports record-only display capture. It can include private content from other
+apps. Review recordings locally before sharing them.
+
+Opening another session first cancels display recording and drains pending
+image writes, before discovery, fixture launch, or capture for that session.
+Both recordings then use their own windows. When only one active session remains,
+display context resumes. Pending openings and legacy shared runs count too.
+Finished credentials do not count as active sessions.
+
+Live previews, agent observations, raw evidence JPEGs, OCR, normalized input
+coordinates, and accessibility authority remain scoped to the selected window.
+No exclusive lease, focus change, physical cursor movement, or foreground-input
+fallback is added. Display capture is supplementary human recording context.
+It records the visible desktop without raising the selected window; other
+windows can cover a background application in that context footage.
+
+`qa_start`, scoped session start, `qa_status`, and the paired pane show
+`recordingScope` with its scope and reason. Display discovery, permission, geometry,
+or prewarm failures explicitly retain window recording. Initial display prewarm
+waits at most 15 seconds, matching the native first-frame budget. Missing footage
+remains a marked gap, not invented video.
+Export provenance separately lists `recordingScopes`, `recordingFrames`, and the
+original hashed `sourceFrames`. Ordinary frame lookup and replay event/frame
+pages do not return supplementary display images.
+
+### Visible input in Live and recordings
+
+Live viewing, QA videos, full-session exports, and their posters show synthetic
+input cues. Agent and human inputs have distinct colors. A coordinate left single
+click shows a plain cursor only when matching run, target, process,
+snapshot layout, and capture geometry establish a point. Element presses without
+coordinates are described outside the video. Attempts, native acknowledgement,
+blocked input, and uncertain input are distinct. An ACK is not a passing check.
+
+Cursor travel between known points is a visualization, not captured physical
+movement. The overlay never moves the operating-system cursor, changes focus, or
+modifies raw JPEGs, agent images, or OCR input. Missing or stale geometry suppresses
+spatial markers. There are no click rings or click animations. Reduced-motion
+preferences disable live travel. Cues expire and are cleared when their view or run changes.
+For display-context recordings, markers map validated window snapshot points
+through global display bounds, capture attachment geometry, and export
+letterboxing. Window-normalized coordinates are never treated as desktop input.
+
+Downloaded MP4s contain clean recorded pixels and plain cursor arrows, with no
+added text, captions, legends, or check-result overlays. Each QA check has a
+two-second opening pause and a result-reading pause, with at least eight seconds
+of playback at 1×. Result pauses allow roughly three words per second, bounded
+between four and twenty seconds. These pauses hold authentic recorded frames and
+are identified by the webpage's controls and provenance, not burned-in labels.
+They are not continued capture. Recorded evidence retains
+its original timing, gaps, and source mapping; pause time is reported separately.
+Read-only observations can connect a recorded input to a
+later check only when actor, target, process, and layout still match, with no
+intervening mutation, ownership change, or recording gap. This is context, not
+proof of causation. Assertion validation is unchanged.
+
+QA edit version 5 and source overlay generation 2 use separate export filenames.
+Previously stored journals, raw frames, and older export generations remain
+intact. Preparing a recording again derives the current marked video locally.
+
+### Descriptive recording names
+
+Recordings use `Application name - QA test description` in Live, review,
+history, results JSON, and new export metadata. The application name comes from
+the exact discovered process display name, not its document or window title.
+Configured application names are a fallback when discovery has no display name.
+Whole-display runs use `Shared display`.
+
+Pass the test purpose as the start title. An already application-prefixed title
+is not prefixed twice. Without a meaningful title, context supplies the purpose.
+otherwise the first named check supplies it from the durable journal. Before
+that check, the honest fallback is `Application name - QA session`. Naming never
+reads personal files or private application data.
+
+Downloads retain the descriptive title, a run discriminator, the correct
+extension, and a QA or full-session marker. Unsafe filename characters are
+removed and Unicode names use UTF-8 download headers. Existing artifact URLs,
+raw frames, journals, and older recordings remain unchanged and readable.
 
 ## Requirements
 
@@ -106,13 +191,27 @@ In the local Factory project, start the broker and keep it running:
 npm run qa -- config.local.json
 ```
 
-From another terminal or agent command **inside the same Factory project session**:
+Start the broker inside the Factory project session to open its assigned browser
+pane automatically on the first agent window run. For manual pairing:
 
 ```sh
 npm run qa:open
 ```
 
 This pairs Factory's existing embedded browser pane, not an external browser.
+For parallel QA use [window sessions](WINDOW-SESSIONS.md): up to four agents
+can operate separate authorized windows, each with its own grant, checks and recording.
+For a disposable RelayMac, use a [managed fixture](MANAGED-FIXTURE.md) and
+close the session when finished. Attaching to an existing app never grants
+permission to terminate it. Closing a session does not remove its recordings.
+For calibrated, repeatable native UI checks, use the
+[one-call text transition procedure](QA-PROCEDURE.md) instead of sending each
+observation and image through the model. Use `compact:true` on scoped finish and
+report calls. Full checks, recordings and exports remain available on demand.
+See [how to validate native QA and token costs](QA-VALIDATION.md).
+If the assigned pane endpoint is missing or rejected, stop. Do not launch a
+browser, substitute a Chrome debugging port, or create, inspect or clean up a
+browser profile. Use RelayMac fixtures, not personal browsers, for Mac tests.
 Optionally run `droid mcp list` to check `factory-relay` and its ten QA tools.
 If missing, reload project MCP servers or reopen the project after setup.
 
@@ -141,8 +240,9 @@ up to 32 apps, then restart the local broker when no run is active. For example:
 
 Merge this field into your existing config, preserving its transport settings.
 Profiles identify an app/device; they contain no app-specific automation.
-Omitting it allows desktop-wide control on one selected display. `qa_start({})`
-selects the actual main display, never the first discovered entry. Other displays
+Omitting it permits, but does not select, whole-display control. Only explicitly
+request `qa_start({applicationId:"desktop"})` to select the actual main display.
+A start without a target or profile never falls back to the display. Other displays
 and restricted windows can be selected explicitly. No per-app profile is needed for generic QA, including
 bare executables whose bundle ID is empty. An explicit array is an allowlist;
 `[]` authorizes no targets. Any explicit array disables desktop authority. IDs must be unique safe identifiers; profile bundle IDs
@@ -164,10 +264,14 @@ A desktop run permits ordinary cross-app interaction on that display only.
 Display disconnect, identity, origin, resolution, scale or rotation changes fail
 closed. No keyboard, permission bypass or protected-surface control is provided.
 
-Optional restricted targets remain `{windowId,pid,bundleId}`. Their exact window
-must be foreground and unobscured at every input point, including public AX hit
-testing. Process identity uses kernel start time, including for bare binaries with
-empty bundle IDs. Window mode intentionally rejects other windows and popovers.
+Restricted targets are `{windowId,pid,bundleId}`. A left single click on a
+pressable accessibility control can run silently even behind another window.
+Unsupported gestures fail with `background_unavailable`; there is no fallback
+to the real cursor. Process identity uses kernel start time, including for bare
+binaries with empty bundle IDs. Window mode rejects other windows and popovers.
+Observation requests a process-local accessibility tree when an application
+advertises that opt-in. This does not change its profile, grant operating-system
+permissions, activate the application, or send an input action.
 
 Calls below use IDs returned by preceding calls, not guessed IDs:
 
@@ -226,6 +330,20 @@ and marked gaps. Existing journals and ready exports are not rewritten.
 Live keeps the same shared image and ownership controls. Count controls are
 disabled for desktop and generic windows. Human pointer interaction in the Live image is not
 implemented; generic input uses `qa_act`, not a second native bridge.
+
+The Live transport is H.264 video plus JPEG evidence on one credit-gated stream.
+The host encodes captures with hardware VideoToolbox (real-time, no B-frames,
+targeting 4 Mbps and 30 fps, not a guaranteed presentation rate) and relays one access unit per `vframe` packet. The wire
+format is Annex B: every NAL unit carries a 4-byte start code, and each keyframe
+access unit is prefixed with in-band SPS and PPS so a decoder can join at any
+keyframe; keyframes arrive at least every two seconds. A 2 Hz JPEG snapshot
+(`frame` packet, unchanged schema) feeds recording, poster and compatibility
+viewing. The browser decodes with WebCodecs onto a canvas and falls back to the
+JPEG snapshots with a visible compatibility note when WebCodecs is unavailable
+or decoding fails. A viewer joining mid-stream first receives the newest JPEG
+and the most recent keyframe, then live access units starting at the next
+keyframe. Sequence numbers are monotonic across both packet types, and malformed
+or oversized access units fail the stream closed.
 
 ### Recording storage and deletion
 

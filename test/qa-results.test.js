@@ -32,7 +32,9 @@ test('agent report supplies failure-first links, source context and honest downl
   assert.equal(data.checks[0].status, 'fail');
   assert.equal(data.checks[0].clip.sourceStartMs.toFixed(6), '19929.107597');
   assert.match(data.checks[0].replayUrl, /&step=0f536356251f5f6b03c837c4408cbed7$/);
-  assert.match(data.reportMarkdown, /only recorded evidence for passing and failing checks/);
+  assert.match(data.reportMarkdown, /review pauses/);
+  assert.match(data.reportMarkdown, /no text is burned into the MP4/);
   assert.match(data.reportMarkdown, /idle between operations are omitted/);
-  assert.ok(data.edit.durationMs > 15000 && data.edit.durationMs < 16000);
+  assert.ok(data.edit.evidenceMs > 15000 && data.edit.evidenceMs < 16000);
+  assert.ok(data.edit.durationMs > data.edit.evidenceMs);
 });
